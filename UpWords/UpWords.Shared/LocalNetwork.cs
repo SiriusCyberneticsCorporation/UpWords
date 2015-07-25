@@ -13,20 +13,39 @@ namespace UpWords
 {
     public class LocalNetwork
     {
-		public delegate void GamePostHandler(string ipAddress, string playerName);
-		public event GamePostHandler OnGamePostReceived;
+		public delegate void ErrorMessageHandler(string message);
+		public event ErrorMessageHandler OnErrorMessage;
+
+		public delegate void GamePostHandler(GameDetails gameInformation);
+		public event GamePostHandler OnGameCreatedReceived;
+		public event GamePostHandler OnGameCancelledReceived;
+		public event GamePostHandler OnGameStartedReceived;
+
+		public delegate void GameJoinedHandler(string playersIpAddress, string playersDetails);
+		public event GameJoinedHandler OnGameJoinedReceived;
+
+		public string IpAddress { get { return m_ipAddress; } }
+		public string MachineName { get { return m_machineName; } }
+		public string Username { get { return m_username; } }
 
 		private const string GAME_PORT = "4321";
 		private const string BROADCAST_IP = "255.255.255.255";
 
 		private bool m_started = false;
+		private bool m_continueRebroadcast = false;
 		private string m_username = string.Empty;
+		private string m_ipAddress = string.Empty;
+		private string m_machineName = string.Empty;
 		private DatagramSocket m_broadcastSocket = new DatagramSocket();
 
 		public enum eProtocol
 		{
-			GamePost,
+			GameCreated,
+			GameCancelled,
+			GameJoined,
+			GameStarted,
 		}
+
 		public LocalNetwork()
 		{
 		}
@@ -35,16 +54,28 @@ namespace UpWords
 		{
 			if (!m_started)
 			{
-				m_username = await Windows.System.UserProfile.UserInformation.GetDisplayNameAsync();
-
-				if (m_username.Length == 0)
+				try
 				{
-					m_username = CurrentMachineName();
+					m_username = await Windows.System.UserProfile.UserInformation.GetDisplayNameAsync();
+
+					if (m_username.Length == 0)
+					{
+						m_username = CurrentMachineName();
+					}
+
+					m_ipAddress = CurrentIPAddress();
+					m_machineName = CurrentMachineName();
+
+					m_broadcastSocket.MessageReceived += SocketOnMessageReceived;
+					await m_broadcastSocket.BindServiceNameAsync(GAME_PORT);
 				}
-
-				m_broadcastSocket.MessageReceived += SocketOnMessageReceived;
-				await m_broadcastSocket.BindServiceNameAsync(GAME_PORT);
-
+				catch (Exception ex)
+				{
+					if (OnErrorMessage != null)
+					{
+						OnErrorMessage(ex.Message);
+					}
+				}
 				m_started = true;
 			}
 		}
@@ -82,9 +113,11 @@ namespace UpWords
 			return localName.DisplayName.Replace(".local", "");
 		}
 
-		public void PostGame(string ipAddress, string playerName)
+		public void CreateGame(string gameTitle)
 		{
-			string message = eProtocol.GamePost.ToString() + "," + ipAddress + "," + playerName;
+			string message = eProtocol.GameCreated.ToString() + "," + m_ipAddress + "," + gameTitle;
+
+			m_continueRebroadcast = true;
 
 			RebroardcastGame(message);
 		}
@@ -95,7 +128,35 @@ namespace UpWords
 
 			await System.Threading.Tasks.Task.Delay(TimeSpan.FromSeconds(15));
 
-			RebroardcastGame(message);
+			if (m_continueRebroadcast)
+			{
+				RebroardcastGame(message);
+			}
+		}
+
+		public void StartGame(string gameTitle)
+		{
+			string message = eProtocol.GameStarted.ToString() + "," + m_ipAddress + "," + gameTitle;
+			
+			m_continueRebroadcast = false;
+			
+			SendMessage(BROADCAST_IP, message);
+		}
+
+		public void JoinGame(GameDetails gameInformation)
+		{
+			string message = eProtocol.GameJoined.ToString() + "," + m_ipAddress + "," + m_username + " on " + m_machineName;;
+
+			SendMessage(gameInformation.CreatorsIpAddress, message);
+		}
+
+		public void CancelGame(string gameTitle)
+		{
+			string message = eProtocol.GameCancelled.ToString() + "," + m_ipAddress + "," + gameTitle;
+
+			m_continueRebroadcast = false;
+
+			SendMessage(BROADCAST_IP, message);
 		}
 
 		private async void SendMessage(string ipAddress, string message)
@@ -115,58 +176,147 @@ namespace UpWords
 			}
 			catch (Exception ex)
 			{
-				//
+				if (OnErrorMessage != null)
+				{
+					OnErrorMessage(ex.Message);
+				}
 			}
 		}
 
 		private async void SocketOnMessageReceived(DatagramSocket sender, DatagramSocketMessageReceivedEventArgs args)
 		{
-			IInputStream result = args.GetDataStream();
-			Stream resultStream = result.AsStreamForRead(1024);
-
-			using (StreamReader reader = new StreamReader(resultStream))
+			try
 			{
-				string message = await reader.ReadToEndAsync();
+				IInputStream result = args.GetDataStream();
+				Stream resultStream = result.AsStreamForRead(1024);
 
-				await Windows.ApplicationModel.Core.CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync
-					(Windows.UI.Core.CoreDispatcherPriority.Normal, () =>
-					{
-						DecodeMessage(message);
-					});
+				using (StreamReader reader = new StreamReader(resultStream))
+				{
+					string message = reader.ReadToEnd();
+
+					await Windows.ApplicationModel.Core.CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync
+						(Windows.UI.Core.CoreDispatcherPriority.Normal, () =>
+						{
+							DecodeMessage(message);
+						});
+				}
+			}
+			catch (Exception ex)
+			{
+				if (OnErrorMessage != null)
+				{
+					OnErrorMessage(ex.Message);
+				}
 			}
 		}
 
 		private void DecodeMessage(string message)
 		{
-			int firstCommaIndex = message.IndexOf(',');
-
-			if (firstCommaIndex > 0)
+			try
 			{
-				string command = message.Substring(0, firstCommaIndex);
-				string messageData = message.Substring(firstCommaIndex + 1);
+				int firstCommaIndex = message.IndexOf(',');
 
-				if (eProtocol.GamePost.ToString().Equals(command))
+				if (firstCommaIndex > 0)
 				{
-					AddGame(messageData);
+					string command = message.Substring(0, firstCommaIndex);
+					string messageData = message.Substring(firstCommaIndex + 1);
+
+					if (eProtocol.GameCreated.ToString().Equals(command))
+					{
+						GameCreated(messageData);
+					}
+					else if (eProtocol.GameCancelled.ToString().Equals(command))
+					{
+						GameCancelled(messageData);
+					}
+					else if (eProtocol.GameJoined.ToString().Equals(command))
+					{
+						GameJoined(messageData);
+					}
+					else if (eProtocol.GameStarted.ToString().Equals(command))
+					{
+						GameStarted(messageData);
+					}
+				}
+			}
+			catch (Exception ex)
+			{
+				if (OnErrorMessage != null)
+				{
+					OnErrorMessage(ex.Message);
 				}
 			}
 		}
 
-		private void AddGame(string messageData)
+		private void GameCreated(string messageData)
 		{
 			int commaIndex = messageData.IndexOf(',');
 
 			if (commaIndex > 0)
 			{
 				string ipAddress = messageData.Substring(0, commaIndex);
-				string playerName = messageData.Substring(commaIndex + 1);
+				string title = messageData.Substring(commaIndex + 1);
 
 				if (ipAddress != CurrentIPAddress())
 				{
-					if(OnGamePostReceived != null)
+					GameDetails gameInformation = new GameDetails() { CreatorsIpAddress = ipAddress, GameTitle = title };
+					if (OnGameCreatedReceived != null)
 					{
-						OnGamePostReceived(ipAddress, playerName);
+						OnGameCreatedReceived(gameInformation);
 					}
+				}
+			}
+		}
+
+		private void GameCancelled(string messageData)
+		{
+			int commaIndex = messageData.IndexOf(',');
+
+			if (commaIndex > 0)
+			{
+				string ipAddress = messageData.Substring(0, commaIndex);
+				string title = messageData.Substring(commaIndex + 1);
+
+				if (ipAddress != CurrentIPAddress())
+				{
+					GameDetails gameInformation = new GameDetails() { CreatorsIpAddress = ipAddress, GameTitle = title };
+					if (OnGameCancelledReceived != null)
+					{
+						OnGameCancelledReceived(gameInformation);
+					}
+				}
+			}
+		}
+
+		private void GameJoined(string messageData)
+		{
+			int commaIndex = messageData.IndexOf(',');
+
+			if (commaIndex > 0)
+			{
+				string playersIpAddress = messageData.Substring(0, commaIndex);
+				string playersDetails = messageData.Substring(commaIndex + 1);
+
+				if (OnGameJoinedReceived != null)
+				{
+					OnGameJoinedReceived(playersIpAddress, playersDetails);
+				}
+			}
+		}
+
+		private void GameStarted(string messageData)
+		{
+			int commaIndex = messageData.IndexOf(',');
+
+			if (commaIndex > 0)
+			{
+				string ipAddress = messageData.Substring(0, commaIndex);
+				string title = messageData.Substring(commaIndex + 1);
+
+				GameDetails gameInformation = new GameDetails() { CreatorsIpAddress = ipAddress, GameTitle = title };
+				if (OnGameStartedReceived != null)
+				{
+					OnGameStartedReceived(gameInformation);
 				}
 			}
 		}

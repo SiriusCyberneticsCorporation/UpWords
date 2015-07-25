@@ -28,7 +28,7 @@
 
 		<Grid Grid.Row="1" Grid.Column="1">
 			<Grid.RowDefinitions>
-				<RowDefinition Height="20*"/>
+				<RowDefinition Height="10*"/>
 				<RowDefinition Height="80*"/>
 			</Grid.RowDefinitions>
 			<Grid.ColumnDefinitions>
@@ -37,7 +37,7 @@
 				<ColumnDefinition Width="10*"/>
 			</Grid.ColumnDefinitions>
 			<StackPanel Grid.Column="1" Margin="0" Grid.Row="1">
-				<Button x:Name="CreateGameButton" Content="Create Game" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Margin="0,20,0,0" Foreground="#FF020202" FontSize="20" Click="CreateGameButton_Click">
+				<Button x:Name="CreateGameButton" Content="Create Game" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Margin="0,10" Foreground="#FF020202" FontSize="20" Click="CreateGameButton_Click" ClickMode="Press">
 					<Button.Background>
 						<LinearGradientBrush EndPoint="0.5,1" StartPoint="0.5,0">
 							<GradientStop Color="#FFF3B872" Offset="0"/>
@@ -47,7 +47,7 @@
 						</LinearGradientBrush>
 					</Button.Background>
 				</Button>
-				<Button x:Name="StartOrJoinGameButton" Content="Start Game" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Margin="0,20,0,0" Foreground="#FF020202" FontSize="20" Click="StartOrJoinGameButton_Click">
+				<Button x:Name="StartGameButton" Content="Start Game" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Margin="0,10" Foreground="#FF020202" FontSize="20" Click="StartGameButton_Click" ClickMode="Press" Visibility="Collapsed">
 					<Button.Background>
 						<LinearGradientBrush EndPoint="0.5,1" StartPoint="0.5,0">
 							<GradientStop Color="#FFF3B872" Offset="0"/>
@@ -57,7 +57,27 @@
 						</LinearGradientBrush>
 					</Button.Background>
 				</Button>
-				<Button x:Name="ResumeGameButton" Content="Resume Game" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Margin="0,20,0,0" Foreground="#FF020202" FontSize="20" Click="ResumeGameButton_Click">
+				<Button x:Name="JoinGameButton" Content="Join Game" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Margin="0,10" Foreground="#FF020202" FontSize="20" ClickMode="Press" Click="JoinGameButton_Click" Visibility="Collapsed">
+					<Button.Background>
+						<LinearGradientBrush EndPoint="0.5,1" StartPoint="0.5,0">
+							<GradientStop Color="#FFF3B872" Offset="0"/>
+							<GradientStop Color="#FFCB7A19" Offset="1"/>
+							<GradientStop Color="#FFEABE92" Offset="0.725"/>
+							<GradientStop Color="#FFF5C28B" Offset="0.323"/>
+						</LinearGradientBrush>
+					</Button.Background>
+				</Button>
+				<Button x:Name="ResumeGameButton" Content="Resume Game" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Margin="0,10" Foreground="#FF020202" FontSize="20" Click="ResumeGameButton_Click" ClickMode="Press" Visibility="Collapsed">
+					<Button.Background>
+						<LinearGradientBrush EndPoint="0.5,1" StartPoint="0.5,0">
+							<GradientStop Color="#FFF3B872" Offset="0"/>
+							<GradientStop Color="#FFCB7A19" Offset="1"/>
+							<GradientStop Color="#FFEABE92" Offset="0.725"/>
+							<GradientStop Color="#FFF5C28B" Offset="0.323"/>
+						</LinearGradientBrush>
+					</Button.Background>
+				</Button>
+				<Button x:Name="CancelGameButton" Content="Cancel Game" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Margin="0,10" Foreground="#FF020202" FontSize="20" Click="CancelGameButton_Click" ClickMode="Press" Visibility="Collapsed">
 					<Button.Background>
 						<LinearGradientBrush EndPoint="0.5,1" StartPoint="0.5,0">
 							<GradientStop Color="#FFF3B872" Offset="0"/>
@@ -74,9 +94,10 @@
 				<RowDefinition Height="10*"/>
 				<RowDefinition Height="80*"/>
 			</Grid.RowDefinitions>
-			<TextBlock HorizontalAlignment="Center" Margin="0" TextWrapping="Wrap" Text="Available Games" VerticalAlignment="Center" FontSize="36"/>
-			<ListView x:Name="AvailableGamesListView" Margin="0" Grid.Row="1" Background="#FF3E3232" BorderBrush="White"/>
+			<TextBlock x:Name="ListTitleTextBlock" HorizontalAlignment="Center" Margin="0" TextWrapping="Wrap" Text="Available Games" VerticalAlignment="Center" FontSize="36"/>
+			<ListView x:Name="AvailableGamesListView" Margin="0" Grid.Row="1" Background="#FF3E3232" BorderBrush="White" SelectionChanged="AvailableGamesListView_SelectionChanged"/>
 
 		</Grid>
+		<TextBlock x:Name="ErrorMessageTextBlock" Grid.Column="1" Margin="0,107,0,0" TextWrapping="Wrap" Text="TextBlock" VerticalAlignment="Top" FontSize="24" Grid.ColumnSpan="2"/>
 	</Grid>
 </Page>
