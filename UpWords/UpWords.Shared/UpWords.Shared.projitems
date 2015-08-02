@@ -15,7 +15,23 @@
     <Compile Include="$(MSBuildThisFileDirectory)App.xaml.cs">
       <DependentUpon>App.xaml</DependentUpon>
     </Compile>
+    <Compile Include="$(MSBuildThisFileDirectory)Enumerations.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)GameDetails.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)LocalNetwork.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)GameSettings.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)LANBase.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)UpwordsNetworking.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)TileControl.xaml.cs">
+      <DependentUpon>TileControl.xaml</DependentUpon>
+    </Compile>
+  </ItemGroup>
+  <ItemGroup>
+    <Page Include="$(MSBuildThisFileDirectory)TileControl.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="$(MSBuildThisFileDirectory)Assets\Tile.png" />
+    <Content Include="$(MSBuildThisFileDirectory)Assets\Words.txt" />
   </ItemGroup>
 </Project>

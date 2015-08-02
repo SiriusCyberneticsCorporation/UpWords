@@ -16,7 +16,7 @@ using Windows.UI.Xaml.Media;
 using Windows.UI.Xaml.Media.Animation;
 using Windows.UI.Xaml.Navigation;
 
-// The Blank Application template is documented at http://go.microsoft.com/fwlink/?LinkId=234227
+using Windows.Storage;
 
 namespace UpWords
 {
@@ -25,9 +25,11 @@ namespace UpWords
     /// </summary>
     public sealed partial class App : Application
     {
-		public LocalNetwork NetworkCommunications { get { return m_localNetwork; } }
+		public IList<string> Words { get { return m_words; } }
+		public UpwordsNetworking NetworkCommunications { get { return m_localNetwork; } }
 
-		private LocalNetwork m_localNetwork = null;
+		private IList<string> m_words = new List<string>();
+		private UpwordsNetworking m_localNetwork = null;
 
 #if WINDOWS_PHONE_APP
         private TransitionCollection transitions;
@@ -57,7 +59,9 @@ namespace UpWords
                 this.DebugSettings.EnableFrameRateCounter = true;
             }
 #endif
-			m_localNetwork = new LocalNetwork();
+			m_localNetwork = new UpwordsNetworking();
+
+			ReadWords();
 
             Frame rootFrame = Window.Current.Content as Frame;
 
@@ -100,8 +104,9 @@ namespace UpWords
                 // When the navigation stack isn't restored navigate to the first page,
                 // configuring the new page by passing required information as a navigation
                 // parameter
-                if (!rootFrame.Navigate(typeof(MainPage), this))
-                {
+				//if (!rootFrame.Navigate(typeof(MainPage), this))
+				if (!rootFrame.Navigate(typeof(GamePage), this))
+				{
                     throw new Exception("Failed to create initial page");
                 }
             }
@@ -138,5 +143,13 @@ namespace UpWords
             // TODO: Save application state and stop any background activity
             deferral.Complete();
         }
+
+
+		private async void ReadWords()
+		{
+			StorageFile wordsFile = await StorageFile.GetFileFromApplicationUriAsync(new Uri("ms-appx:///Assets/Words.txt", UriKind.Absolute));
+			m_words = await FileIO.ReadLinesAsync(wordsFile);
+		}
+
     }
 }

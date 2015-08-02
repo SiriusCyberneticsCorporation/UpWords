@@ -106,7 +106,6 @@
     <!-- A reference to the entire .Net Framework and Windows SDK are automatically included -->
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Enumerations.cs" />
     <Compile Include="GamePage.xaml.cs">
       <DependentUpon>GamePage.xaml</DependentUpon>
     </Compile>
@@ -114,9 +113,6 @@
       <DependentUpon>MainPage.xaml</DependentUpon>
     </Compile>
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="TileControl.xaml.cs">
-      <DependentUpon>TileControl.xaml</DependentUpon>
-    </Compile>
   </ItemGroup>
   <ItemGroup>
     <AppxManifest Include="Package.appxmanifest">
@@ -125,29 +121,12 @@
     <None Include="UpWords.Windows_TemporaryKey.pfx" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="Assets\A.png" />
-    <Content Include="Assets\C.png" />
-    <Content Include="Assets\D.png" />
-    <Content Include="Assets\E.png" />
-    <Content Include="Assets\F.png" />
-    <Content Include="Assets\G.png" />
     <Content Include="Assets\GameBoard.png" />
-    <Content Include="Assets\H.png" />
-    <Content Include="Assets\I.png" />
-    <Content Include="Assets\J.png" />
-    <Content Include="Assets\K.png" />
-    <Content Include="Assets\L.png" />
+    <Content Include="Assets\img1.jpg" />
     <Content Include="Assets\Logo.scale-100.png" />
     <Content Include="Assets\Logo.scale-140.png" />
     <Content Include="Assets\Logo.scale-180.png" />
     <Content Include="Assets\Logo.scale-80.png" />
-    <Content Include="Assets\M.png" />
-    <Content Include="Assets\N.png" />
-    <Content Include="Assets\O.png" />
-    <Content Include="Assets\P.png" />
-    <Content Include="Assets\Q.png" />
-    <Content Include="Assets\R.png" />
-    <Content Include="Assets\S.png" />
     <Content Include="Assets\SmallLogo.scale-100.png" />
     <Content Include="Assets\SmallLogo.scale-180.png" />
     <Content Include="Assets\SplashScreen.scale-100.png" />
@@ -164,14 +143,7 @@
     <Content Include="Assets\StoreLogo.scale-100.png" />
     <Content Include="Assets\StoreLogo.scale-140.png" />
     <Content Include="Assets\StoreLogo.scale-180.png" />
-    <Content Include="Assets\T.png" />
-    <Content Include="Assets\U.png" />
-    <Content Include="Assets\V.png" />
-    <Content Include="Assets\W.png" />
     <Content Include="Assets\Wide310x150Logo.scale-180.png" />
-    <Content Include="Assets\X.png" />
-    <Content Include="Assets\Y.png" />
-    <Content Include="Assets\Z.png" />
   </ItemGroup>
   <ItemGroup>
     <Page Include="GamePage.xaml">
@@ -179,10 +151,6 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="MainPage.xaml">
-      <Generator>MSBuild:Compile</Generator>
-      <SubType>Designer</SubType>
-    </Page>
-    <Page Include="TileControl.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>

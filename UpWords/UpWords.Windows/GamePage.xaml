@@ -7,26 +7,101 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d">
 
-    <Grid x:Name="MainGrid" Loaded="MainGrid_Loaded">
+	<Grid x:Name="MainGrid" Loaded="MainGrid_Loaded">
 		<Grid.Background>
-			<LinearGradientBrush EndPoint="0.5,1" StartPoint="0.5,0">
-				<GradientStop Color="#FF177A32" Offset="0"/>
-				<GradientStop Color="#FF348B4C" Offset="1"/>
-			</LinearGradientBrush>
+			<ImageBrush Stretch="UniformToFill" ImageSource="Assets/img1.jpg"/>
 		</Grid.Background>
 		<Grid.RowDefinitions>
-			<RowDefinition Height="10*"/>
-			<RowDefinition Height="80*"/>
+			<RowDefinition Height="2*"/>
+			<RowDefinition Height="88*"/>
 			<RowDefinition Height="10*"/>
 		</Grid.RowDefinitions>
 		<Grid.ColumnDefinitions>
-			<ColumnDefinition Width="10*"/>
-			<ColumnDefinition Width="40*"/>
-			<ColumnDefinition Width="10*"/>
+			<ColumnDefinition Width="25*"/>
+			<ColumnDefinition Width="50*"/>
+			<ColumnDefinition Width="25*"/>
 		</Grid.ColumnDefinitions>
 
-		<Image x:Name="UpWordsBoard" Source="Assets/GameBoard.png" Grid.Row="1" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" SizeChanged="UpWordsBoard_SizeChanged"/>
-		<Grid x:Name="TilePanel" Grid.Row="2" Grid.Column="1"> </Grid>
+		<Border Grid.Row="1" Grid.Column="1" Background="#FF8B8B8B" BorderThickness="1" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0" Padding="5" >
+			<Image x:Name="UpWordsBoard" Source="Assets/GameBoard.png" Grid.Row="1" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" SizeChanged="UpWordsBoard_SizeChanged"/>
+		</Border>
+		<Grid x:Name="TilePanel" Grid.Row="2" Grid.Column="1"></Grid>
 		<Canvas x:Name="TileCanvas" Grid.Row="1" Grid.RowSpan="2" Grid.Column="1"></Canvas>
+		<Grid x:Name="MessageTextBoxGrid" HorizontalAlignment="Center" Margin="0,40,0,0" Grid.Row="1" VerticalAlignment="Top" Background="#FFF5DB38" Grid.ColumnSpan="3">
+			<TextBlock x:Name="MessageTextBox" Margin="5" TextWrapping="Wrap" Text="TextBlock" TextAlignment="Center" Foreground="#FF0A0A0A" FontSize="20"/>
+		</Grid>
+
+		<Grid Grid.Row="1" Grid.Column="2" Grid.RowSpan="1">
+			<Grid.RowDefinitions>
+				<RowDefinition Height="10*"/>
+				<RowDefinition Height="90*"/>
+			</Grid.RowDefinitions>
+			<Grid.ColumnDefinitions>
+				<ColumnDefinition Width="5*"/>
+				<ColumnDefinition Width="90*"/>
+				<ColumnDefinition Width="5*"/>
+			</Grid.ColumnDefinitions>
+			<Button x:Name="SubmitButton" Content="Submit" FontSize="32" Foreground="White" HorizontalAlignment="Stretch" Click="SubmitButton_Click" Margin="0" Grid.Column="1" Grid.Row="1" VerticalAlignment="Top">
+				<Button.Background>
+					<LinearGradientBrush EndPoint="0.5,1" StartPoint="0.5,0">
+						<GradientStop Color="#FF073600" Offset="0"/>
+						<GradientStop Color="#FF5B7E37" Offset="0.625"/>
+						<GradientStop Color="#FF073600" Offset="1"/>
+					</LinearGradientBrush>
+				</Button.Background>
+			</Button>
+			<StackPanel Grid.Column="1" Margin="0" Grid.Row="1" VerticalAlignment="Center">
+				<Button x:Name="ShuffleLettersButton" Content="Shuffle Letters" FontSize="32" Foreground="White" HorizontalAlignment="Stretch" Margin="0,10,0,0" Click="ShuffleLettersButton_Click" >
+					<Button.Background>
+						<LinearGradientBrush EndPoint="0.5,1" StartPoint="0.5,0">
+							<GradientStop Color="#FF000064" Offset="0"/>
+							<GradientStop Color="Blue" Offset="0.424"/>
+							<GradientStop Color="#FF000064" Offset="1"/>
+							<GradientStop Color="#FF0000F5" Offset="0.606"/>
+						</LinearGradientBrush>
+					</Button.Background>
+				</Button>
+				<Button x:Name="ChangeLetterButton" Content="Change a Letter" FontSize="32" Foreground="White" HorizontalAlignment="Stretch" Margin="0,10,0,0" Click="ChangeLetterButton_Click" >
+					<Button.Background>
+						<LinearGradientBrush EndPoint="0.5,1" StartPoint="0.5,0">
+							<GradientStop Color="#FF000064" Offset="0"/>
+							<GradientStop Color="Blue" Offset="0.424"/>
+							<GradientStop Color="#FF000064" Offset="1"/>
+							<GradientStop Color="#FF0000F5" Offset="0.606"/>
+						</LinearGradientBrush>
+					</Button.Background>
+				</Button>
+				<Button x:Name="RecallLettersButton" Content="Recall Letters" FontSize="32" Foreground="White" HorizontalAlignment="Stretch" Margin="0,10,0,0" Click="RecallLettersButton_Click" >
+					<Button.Background>
+						<LinearGradientBrush EndPoint="0.5,1" StartPoint="0.5,0">
+							<GradientStop Color="#FF000064" Offset="0"/>
+							<GradientStop Color="Blue" Offset="0.424"/>
+							<GradientStop Color="#FF000064" Offset="1"/>
+							<GradientStop Color="#FF0000F5" Offset="0.606"/>
+						</LinearGradientBrush>
+					</Button.Background>
+				</Button>
+				<Button x:Name="SkipTurnButton" Content="Skip Turn" FontSize="32" Foreground="White" HorizontalAlignment="Stretch" Margin="0,10,0,0" Click="SkipTurnButton_Click" >
+					<Button.Background>
+						<LinearGradientBrush EndPoint="0.5,1" StartPoint="0.5,0">
+							<GradientStop Color="#FF000064" Offset="0"/>
+							<GradientStop Color="Blue" Offset="0.424"/>
+							<GradientStop Color="#FF000064" Offset="1"/>
+							<GradientStop Color="#FF0000F5" Offset="0.606"/>
+						</LinearGradientBrush>
+					</Button.Background>
+				</Button>
+			</StackPanel>
+			<Button x:Name="ResignGameButton" Content="Resign Game" FontSize="32" Foreground="White" HorizontalAlignment="Stretch" Margin="0" Grid.Column="1" Grid.Row="3" VerticalAlignment="Bottom" Click="ResignGameButton_Click">
+				<Button.Background>
+					<LinearGradientBrush EndPoint="0.5,1" StartPoint="0.5,0">
+						<GradientStop Color="#FFB41E0A" Offset="0"/>
+						<GradientStop Color="#FFA0140A" Offset="0.766"/>
+						<GradientStop Color="#FFB41E0A" Offset="1"/>
+						<GradientStop Color="#FFA0140A" Offset="0.275"/>
+					</LinearGradientBrush>
+				</Button.Background>
+			</Button>
+		</Grid>
 	</Grid>
 </Page>

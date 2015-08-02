@@ -24,7 +24,6 @@ namespace UpWords
     {
 		private bool m_gameCreated = false;
 		private App m_parentClass = null;
-		private GameDetails m_gameJoined = null;
 		private Dictionary<string, GameDetails> m_knownGames = new Dictionary<string, GameDetails>();
 		private Dictionary<string, string> m_playersJoined = new Dictionary<string, string>();
 
@@ -81,8 +80,8 @@ namespace UpWords
 			{
 				Frame.Navigate(typeof(GamePage), false);
 			}
-			else if(m_gameJoined.CreatorsIpAddress == gameInformation.CreatorsIpAddress &&
-					m_gameJoined.GameTitle == gameInformation.GameTitle)
+			else if (GameSettings.Settings.GameJoined.CreatorsIpAddress == gameInformation.CreatorsIpAddress &&
+					GameSettings.Settings.GameJoined.GameTitle == gameInformation.GameTitle)
 			{
 				Frame.Navigate(typeof(GamePage), false);
 			}
@@ -108,14 +107,12 @@ namespace UpWords
 		{
 			if (m_parentClass != null)
 			{
-				GameDetails gameInformation = new GameDetails()
-				{
-					CreatorsIpAddress = m_parentClass.NetworkCommunications.IpAddress,
-					GameTitle = m_parentClass.NetworkCommunications.Username + " on " + m_parentClass.NetworkCommunications.MachineName
-				};
+				GameSettings.Settings.GameCreated.CreatorsIpAddress = m_parentClass.NetworkCommunications.IpAddress;
+				GameSettings.Settings.GameCreated.GameTitle = m_parentClass.NetworkCommunications.Username + " on " + m_parentClass.NetworkCommunications.MachineName;
+				GameSettings.SaveSettings();
 
-				m_parentClass.NetworkCommunications.CreateGame(gameInformation.GameTitle);
-				m_knownGames.Add(gameInformation.GameTitle, gameInformation);
+				m_parentClass.NetworkCommunications.CreateGame(GameSettings.Settings.GameCreated.GameTitle);
+				m_knownGames.Add(GameSettings.Settings.GameCreated.GameTitle, GameSettings.Settings.GameCreated);
 
 				m_playersJoined.Clear();
 				AvailableGamesListView.Items.Clear();
@@ -143,8 +140,9 @@ namespace UpWords
 				string gameTitle = AvailableGamesListView.SelectedItem as string;
 
 				m_parentClass.NetworkCommunications.JoinGame(m_knownGames[gameTitle]);
-				
-				m_gameJoined = m_knownGames[gameTitle];
+
+				GameSettings.Settings.GameJoined = m_knownGames[gameTitle];
+				GameSettings.SaveSettings();
 			}
 		}
 
