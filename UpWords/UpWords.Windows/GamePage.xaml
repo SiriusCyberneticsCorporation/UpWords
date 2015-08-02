@@ -103,5 +103,7 @@
 				</Button.Background>
 			</Button>
 		</Grid>
+		<TextBlock x:Name="TileRemainingTextBlock" Grid.Column="2" Margin="10" Grid.Row="2" TextWrapping="Wrap" FontSize="24"/>
+		<RichTextBlock x:Name="PlaysRichTextBlock" Margin="10,0" Grid.Row="1"/>
 	</Grid>
 </Page>

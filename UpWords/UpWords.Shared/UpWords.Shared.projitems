@@ -19,6 +19,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)GameDetails.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)GameSettings.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)LANBase.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)UpwordsGame.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UpwordsNetworking.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)TileControl.xaml.cs">
       <DependentUpon>TileControl.xaml</DependentUpon>

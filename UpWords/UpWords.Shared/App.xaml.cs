@@ -16,8 +16,6 @@ using Windows.UI.Xaml.Media;
 using Windows.UI.Xaml.Media.Animation;
 using Windows.UI.Xaml.Navigation;
 
-using Windows.Storage;
-
 namespace UpWords
 {
     /// <summary>
@@ -25,10 +23,8 @@ namespace UpWords
     /// </summary>
     public sealed partial class App : Application
     {
-		public IList<string> Words { get { return m_words; } }
 		public UpwordsNetworking NetworkCommunications { get { return m_localNetwork; } }
 
-		private IList<string> m_words = new List<string>();
 		private UpwordsNetworking m_localNetwork = null;
 
 #if WINDOWS_PHONE_APP
@@ -60,8 +56,6 @@ namespace UpWords
             }
 #endif
 			m_localNetwork = new UpwordsNetworking();
-
-			ReadWords();
 
             Frame rootFrame = Window.Current.Content as Frame;
 
@@ -143,13 +137,6 @@ namespace UpWords
             // TODO: Save application state and stop any background activity
             deferral.Complete();
         }
-
-
-		private async void ReadWords()
-		{
-			StorageFile wordsFile = await StorageFile.GetFileFromApplicationUriAsync(new Uri("ms-appx:///Assets/Words.txt", UriKind.Absolute));
-			m_words = await FileIO.ReadLinesAsync(wordsFile);
-		}
 
     }
 }
