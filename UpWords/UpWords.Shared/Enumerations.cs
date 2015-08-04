@@ -7,6 +7,18 @@ using System.Threading.Tasks;
 
 namespace UpWords
 {
+	public enum eProtocol
+	{
+		Acknowledge,
+		GameCreated,
+		GameCancelled,
+		GameJoined,
+		SendLetters,
+		SetActivePlayer,
+		StartGame,
+		PlayersTurnDetails,
+	}
+
 	public enum eTileState
 	{
 		Unknown,
@@ -22,6 +34,7 @@ namespace UpWords
 	{
 		Unknown,
 		PlayersTurn,
+		OpponentsTurn,
 		ComputersTurn,
 		GameOver,
 	}

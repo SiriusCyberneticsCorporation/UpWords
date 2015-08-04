@@ -32,11 +32,6 @@ namespace UpWords
 		{
 			this.InitializeComponent();
 
-			m_gameInstance = new UpwordsGame(TilePanel, UpWordsBoard, TileCanvas);
-			m_gameInstance.OnShowMessage += GameInstance_OnScreenMessage;
-			m_gameInstance.OnChangingALetter += GameInstance_OnChangingALetter;
-			m_gameInstance.OnDisplayPlays += GameInstance_OnDisplayPlays;
-
 			m_gameTimer.Tick += GameTimer_Tick;
 			m_gameTimer.Interval = new TimeSpan(0, 0, 1);
 		}
@@ -46,13 +41,31 @@ namespace UpWords
 			if (e.Parameter is App)
 			{
 				m_parentClass = e.Parameter as App;
+
+				m_gameInstance = new UpwordsGame(TilePanel, UpWordsBoard, TileCanvas, m_parentClass.NetworkCommunications);
+				m_gameInstance.OnShowMessage += GameInstance_OnScreenMessage;
+				m_gameInstance.OnChangingALetter += GameInstance_OnChangingALetter;
+				m_gameInstance.OnDisplayPlays += GameInstance_OnDisplayPlays;
+				m_gameInstance.TurnIndicator += m_gameInstance_TurnIndicator;
+
+				m_gameInstance.InitialiseGame(m_parentClass.StartingLetters);
+
+				m_gameTimer.Start();
 			}
-			m_gameTimer.Start();
+			else
+			{
+				MessageTextBox.Text = "Failed to start!!";
+			}
+		}
+
+		void m_gameInstance_TurnIndicator(string message)
+		{
+			TurnIndicatorTextBlock.Text = message;
 		}
 
 		private void MainGrid_Loaded(object sender, RoutedEventArgs e)
 		{
-			m_gameInstance.StartNewGame();
+			//m_gameInstance.StartNewGame();
 		}
 
 		private void UpWordsBoard_SizeChanged(object sender, SizeChangedEventArgs e)

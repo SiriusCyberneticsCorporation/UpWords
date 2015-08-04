@@ -22,10 +22,8 @@ namespace UpWords
     /// </summary>
     public sealed partial class MainPage : Page
     {
-		private bool m_gameCreated = false;
 		private App m_parentClass = null;
-		private Dictionary<string, GameDetails> m_knownGames = new Dictionary<string, GameDetails>();
-		private Dictionary<string, string> m_playersJoined = new Dictionary<string, string>();
+		private Dictionary<string, string> m_knownGames = new Dictionary<string, string>();
 
         public MainPage()
         {
@@ -44,13 +42,13 @@ namespace UpWords
 				m_parentClass.NetworkCommunications.OnGameCreatedReceived -= NetworkCommunications_OnGameCreatedReceived;
 				m_parentClass.NetworkCommunications.OnGameCancelledReceived -= NetworkCommunications_OnGameCancelledReceived;
 				m_parentClass.NetworkCommunications.OnGameJoinedReceived -= NetworkCommunications_OnGameJoinedReceived;
-				m_parentClass.NetworkCommunications.OnGameStartedReceived -= NetworkCommunications_OnGameStartedReceived;
+				m_parentClass.NetworkCommunications.OnStartGameReceived -= NetworkCommunications_OnStartGameReceived;
 
 				m_parentClass.NetworkCommunications.OnErrorMessage += NetworkCommunications_OnErrorMessage;
 				m_parentClass.NetworkCommunications.OnGameCreatedReceived += NetworkCommunications_OnGameCreatedReceived;
 				m_parentClass.NetworkCommunications.OnGameCancelledReceived += NetworkCommunications_OnGameCancelledReceived;
 				m_parentClass.NetworkCommunications.OnGameJoinedReceived += NetworkCommunications_OnGameJoinedReceived;
-				m_parentClass.NetworkCommunications.OnGameStartedReceived += NetworkCommunications_OnGameStartedReceived;
+				m_parentClass.NetworkCommunications.OnStartGameReceived += NetworkCommunications_OnStartGameReceived;
 
 				m_parentClass.NetworkCommunications.Start();
 			}
@@ -65,25 +63,21 @@ namespace UpWords
 		{
 			if (!m_knownGames.ContainsKey(gameInformation.GameTitle))
 			{
-				m_knownGames.Add(gameInformation.GameTitle, gameInformation);
+				m_knownGames.Add(gameInformation.GameTitle, gameInformation.CreatorsIpAddress);
 
-				if (!m_gameCreated)
+				if (!GameSettings.Settings.GameCreated)
 				{
 					AvailableGamesListView.Items.Add(gameInformation.GameTitle);
 				}
 			}
 		}
 
-		void NetworkCommunications_OnGameStartedReceived(GameDetails gameInformation)
+		void NetworkCommunications_OnStartGameReceived(string serverIP, List<string> letters)
 		{
-			if (m_gameCreated)
+			if (GameSettings.Settings.CreatorsIpAddress == serverIP)
 			{
-				Frame.Navigate(typeof(GamePage), false);
-			}
-			else if (GameSettings.Settings.GameJoined.CreatorsIpAddress == gameInformation.CreatorsIpAddress &&
-					GameSettings.Settings.GameJoined.GameTitle == gameInformation.GameTitle)
-			{
-				Frame.Navigate(typeof(GamePage), false);
+				m_parentClass.StartingLetters = letters;
+				Frame.Navigate(typeof(GamePage), m_parentClass);
 			}
 		}
 
@@ -98,7 +92,8 @@ namespace UpWords
 
 		void NetworkCommunications_OnGameJoinedReceived(string playersIpAddress, string playersDetails)
 		{
-			m_playersJoined.Add(playersIpAddress, playersDetails);
+			GameSettings.Settings.PlayersJoined.Add(playersIpAddress, playersDetails);
+			GameSettings.SaveSettings();
 			
 			AvailableGamesListView.Items.Add(playersDetails);
 		}
@@ -107,29 +102,27 @@ namespace UpWords
 		{
 			if (m_parentClass != null)
 			{
-				GameSettings.Settings.GameCreated.CreatorsIpAddress = m_parentClass.NetworkCommunications.IpAddress;
-				GameSettings.Settings.GameCreated.GameTitle = m_parentClass.NetworkCommunications.Username + " on " + m_parentClass.NetworkCommunications.MachineName;
+				GameSettings.Settings.GameCreated = true;
+				GameSettings.Settings.CreatorsIpAddress = m_parentClass.NetworkCommunications.IpAddress;
+				GameSettings.Settings.GameTitle = m_parentClass.NetworkCommunications.Username + " on " + m_parentClass.NetworkCommunications.MachineName;
+				GameSettings.Settings.PlayersJoined.Clear();
 				GameSettings.SaveSettings();
 
-				m_parentClass.NetworkCommunications.CreateGame(GameSettings.Settings.GameCreated.GameTitle);
-				m_knownGames.Add(GameSettings.Settings.GameCreated.GameTitle, GameSettings.Settings.GameCreated);
+				m_parentClass.NetworkCommunications.CreateGame(GameSettings.Settings.GameTitle);
+				//m_knownGames.Add(GameSettings.Settings.GameTitle, GameSettings.Settings.GameCreated);
 
-				m_playersJoined.Clear();
 				AvailableGamesListView.Items.Clear();
 				ListTitleTextBlock.Text = "Players Joined";
 				CreateGameButton.IsEnabled = false;
 				StartGameButton.Visibility = Windows.UI.Xaml.Visibility.Visible;
-				m_gameCreated = true;
 			}
 		}
 
 		private void StartGameButton_Click(object sender, RoutedEventArgs e)
 		{
-			if(m_gameCreated)
+			if (GameSettings.Settings.GameCreated)
 			{
-				string gameTitle = m_parentClass.NetworkCommunications.Username + " on " + m_parentClass.NetworkCommunications.MachineName;
-
-				m_parentClass.NetworkCommunications.StartGame(gameTitle);
+				Frame.Navigate(typeof(GamePage), m_parentClass);
 			}
 		}
 
@@ -141,7 +134,8 @@ namespace UpWords
 
 				m_parentClass.NetworkCommunications.JoinGame(m_knownGames[gameTitle]);
 
-				GameSettings.Settings.GameJoined = m_knownGames[gameTitle];
+				GameSettings.Settings.GameCreated = false;
+				GameSettings.Settings.CreatorsIpAddress = m_knownGames[gameTitle];
 				GameSettings.SaveSettings();
 			}
 		}
@@ -153,7 +147,7 @@ namespace UpWords
 
 		private void CancelGameButton_Click(object sender, RoutedEventArgs e)
 		{
-			if (m_gameCreated && AvailableGamesListView.SelectedIndex >= 0)
+			if (GameSettings.Settings.GameCreated && AvailableGamesListView.SelectedIndex >= 0)
 			{
 				string gameInformation = AvailableGamesListView.SelectedItem as string;
 
@@ -164,13 +158,14 @@ namespace UpWords
 				ListTitleTextBlock.Text = "Available Games";
 				CreateGameButton.IsEnabled = true;
 				StartGameButton.Visibility = Windows.UI.Xaml.Visibility.Collapsed;
-				m_gameCreated = false;
+				GameSettings.Settings.GameCreated = false;
+				GameSettings.SaveSettings();
 			}
 		}
 
 		private void AvailableGamesListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
 		{
-			if(m_gameCreated)
+			if (GameSettings.Settings.GameCreated)
 			{
 				if(AvailableGamesListView.SelectedIndex >= 0)
 				{

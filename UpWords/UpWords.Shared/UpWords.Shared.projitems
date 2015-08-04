@@ -12,13 +12,21 @@
     <ApplicationDefinition Include="$(MSBuildThisFileDirectory)App.xaml">
       <SubType>Designer</SubType>
     </ApplicationDefinition>
+    <Compile Include="$(MSBuildThisFileDirectory)Acknowledgement.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)App.xaml.cs">
       <DependentUpon>App.xaml</DependentUpon>
     </Compile>
+    <Compile Include="$(MSBuildThisFileDirectory)CurrentGame.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Enumerations.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)GameDetails.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)GameSettings.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)LANBase.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)NetworkMessage.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)PlayersTurnDetails.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Serialiser.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)TileDetails.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)TurnDetails.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)UpWord.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UpwordsGame.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UpwordsNetworking.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)TileControl.xaml.cs">

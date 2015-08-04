@@ -24,8 +24,9 @@ namespace UpWords
     public sealed partial class App : Application
     {
 		public UpwordsNetworking NetworkCommunications { get { return m_localNetwork; } }
-
 		private UpwordsNetworking m_localNetwork = null;
+
+		public List<string> StartingLetters;
 
 #if WINDOWS_PHONE_APP
         private TransitionCollection transitions;
@@ -56,6 +57,12 @@ namespace UpWords
             }
 #endif
 			m_localNetwork = new UpwordsNetworking();
+
+			GameSettings.Settings.GameCreated = false;
+			GameSettings.Settings.CreatorsIpAddress = "";
+			GameSettings.Settings.GameTitle = "";
+			GameSettings.Settings.PlayersJoined.Clear();
+			GameSettings.SaveSettings();
 
             Frame rootFrame = Window.Current.Content as Frame;
 
@@ -98,8 +105,8 @@ namespace UpWords
                 // When the navigation stack isn't restored navigate to the first page,
                 // configuring the new page by passing required information as a navigation
                 // parameter
-				//if (!rootFrame.Navigate(typeof(MainPage), this))
-				if (!rootFrame.Navigate(typeof(GamePage), this))
+				if (!rootFrame.Navigate(typeof(MainPage), this))
+				//if (!rootFrame.Navigate(typeof(GamePage), this))
 				{
                     throw new Exception("Failed to create initial page");
                 }

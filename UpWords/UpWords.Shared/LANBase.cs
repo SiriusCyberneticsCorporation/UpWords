@@ -20,7 +20,7 @@ namespace UpWords
 		public string Username { get { return m_username; } }
 
 		private const string GAME_PORT = "4321";
-		private const string BROADCAST_IP = "255.255.255.255";
+		protected const string BROADCAST_IP = "255.255.255.255";
 
 		private bool m_started = false;
 		private string m_username = string.Empty;
@@ -28,7 +28,7 @@ namespace UpWords
 		private string m_machineName = string.Empty;
 		private DatagramSocket m_broadcastSocket = new DatagramSocket();
 
-		protected abstract void DecodeMessage(HostName remoteAddress, string message);
+		protected abstract void DecodeMessage(HostName remoteAddress, NetworkMessagePacket message);
 
 		public async void Start()
 		{
@@ -57,20 +57,16 @@ namespace UpWords
 			}
 		}
 
-		public void BroadcastMessage(string message)
-		{
-			SendMessage(BROADCAST_IP, message);
-		}
-
-		public async void SendMessage(string ipAddress, string message)
+		public async void SendMessage(NetworkMessage message)
 		{
 			try
 			{
-				using (IOutputStream stream = await m_broadcastSocket.GetOutputStreamAsync(new HostName(ipAddress), GAME_PORT))
+				message.TimeStamp = DateTime.Now;
+				using (IOutputStream stream = await m_broadcastSocket.GetOutputStreamAsync(new HostName(message.RecipientsIP), GAME_PORT))
 				{
 					using (DataWriter writer = new DataWriter(stream))
 					{
-						var data = System.Text.Encoding.UTF8.GetBytes(message);
+						var data = System.Text.Encoding.UTF8.GetBytes(Serialiser.SerializeToXml<NetworkMessagePacket>(message.MessagePacket));
 
 						writer.WriteBytes(data);
 						await writer.StoreAsync();
@@ -92,7 +88,8 @@ namespace UpWords
 				
 				using (StreamReader reader = new StreamReader(resultStream))
 				{
-					string message = reader.ReadToEnd();
+					string messageText = reader.ReadToEnd();
+					NetworkMessagePacket message = Serialiser.DeserializeFromXml<NetworkMessagePacket>(messageText);
 
 					await Windows.ApplicationModel.Core.CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync
 						(Windows.UI.Core.CoreDispatcherPriority.Normal, () =>
