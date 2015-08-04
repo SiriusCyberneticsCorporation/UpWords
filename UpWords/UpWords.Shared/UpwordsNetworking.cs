@@ -30,128 +30,8 @@ namespace UpWords
 		public delegate void TurnDetailsHandler(string playersIpAddress, PlayersTurnDetails iPlayersTurnDetails);
 		public event TurnDetailsHandler OnPlayersTurnDetailsReceived;
 
-		private object m_messageQueueLock = new object();
-		private List<NetworkMessage> m_outstandingMessages = new List<NetworkMessage>();
-
 		public UpwordsNetworking()
 		{
-			SendOutstandingMessages();
-		}
-
-		private async void SendOutstandingMessages()
-		{
-			try
-			{
-				await System.Threading.Tasks.Task.Delay(TimeSpan.FromSeconds(1));
-
-				lock (m_messageQueueLock)
-				{
-					NetworkMessage messageToRemove = null;
-
-					foreach (NetworkMessage message in m_outstandingMessages)
-					{
-						if (DateTime.Now.Subtract(message.TimeStamp).TotalSeconds > 3)
-						{
-							SendMessage(message);
-
-							if(message.MessagePacket.Command == eProtocol.Acknowledge)
-							{
-								messageToRemove = message;
-							}
-						}
-					}
-
-					if (messageToRemove != null)
-					{
-						m_outstandingMessages.Remove(messageToRemove);
-					}
-				}
-			}
-			catch (Exception ex)
-			{
-				PostMessage(ex.Message);
-
-			}
-			SendOutstandingMessages();
-		}
-
-		private void AddMessageToQueue(NetworkMessage message)
-		{
-			lock(m_messageQueueLock)
-			{
-				m_outstandingMessages.Add(message);
-			}
-		}
-
-		private bool QueueContainsMessage(string destinationIP, eProtocol command)
-		{
-			bool containsMessage = false;
-			
-			lock (m_messageQueueLock)
-			{
-				foreach (NetworkMessage message in m_outstandingMessages)
-				{
-					if (message.RecipientsIP == destinationIP && message.MessagePacket.Command == command)
-					{
-						containsMessage = true;
-						break;
-					}
-				}
-			}
-
-			return containsMessage;
-		}
-
-		private void RemoveMessageFromQueue(Guid messageID)
-		{
-			lock (m_messageQueueLock)
-			{
-				NetworkMessage messageToRemove = null;
-				foreach (NetworkMessage message in m_outstandingMessages)
-				{
-					if (message.MessagePacket.ID == messageID)
-					{
-						messageToRemove = message;
-						break;
-					}
-				}
-				if (messageToRemove != null)
-				{
-					m_outstandingMessages.Remove(messageToRemove);
-				}
-			}
-		}
-
-		private void RemoveMessageFromQueue(string destinationIP, eProtocol command)
-		{
-			lock (m_messageQueueLock)
-			{
-				NetworkMessage messageToRemove = null;
-				foreach (NetworkMessage message in m_outstandingMessages)
-				{
-					if(message.RecipientsIP == destinationIP && message.MessagePacket.Command == command)
-					{
-						messageToRemove = message;
-						break;
-					}
-				}
-				m_outstandingMessages.Remove(messageToRemove);
-			}
-		}
-
-		private void AcknowledgedMessage(string recipientsIP, NetworkMessagePacket messagePacket)
-		{
-			NetworkMessage message = new NetworkMessage()
-			{
-				RecipientsIP = recipientsIP,
-				MessagePacket = new NetworkMessagePacket()
-				{
-					ID = messagePacket.ID,
-					Command = eProtocol.Acknowledge
-				}
-			};
-
-			AddMessageToQueue(message);
 		}
 
 		public void CreateGame(string gameTitle)
@@ -324,7 +204,6 @@ namespace UpWords
 					OnGameCreatedReceived(gameInformation);
 				}
 			}
-			AcknowledgedMessage(remoteAddress.CanonicalName, message);
 		}
 
 		private void GameCancelledReceived(HostName remoteAddress, NetworkMessagePacket message)
@@ -337,7 +216,6 @@ namespace UpWords
 					OnGameCancelledReceived(gameInformation);
 				}
 			}
-			AcknowledgedMessage(remoteAddress.CanonicalName, message);
 		}
 
 		private void GameJoinedReceived(HostName remoteAddress, NetworkMessagePacket message)
@@ -361,7 +239,6 @@ namespace UpWords
 
 			SendMessage(remoteAddress.CanonicalName, iNetworkMessagePacket);
 			*/
-			AcknowledgedMessage(remoteAddress.CanonicalName, message);
 		}
 
 		private void LettersReceived(HostName remoteAddress, NetworkMessagePacket message)
@@ -372,7 +249,6 @@ namespace UpWords
 			{
 				OnLettersReceived(remoteAddress.CanonicalName, letters);
 			}
-			AcknowledgedMessage(remoteAddress.CanonicalName, message);
 		}
 
 		private void SetActivePlayerReceived(HostName remoteAddress, NetworkMessagePacket message)
@@ -383,7 +259,6 @@ namespace UpWords
 			{
 				OnSetActivePlayerReceived(active);
 			}
-			AcknowledgedMessage(remoteAddress.CanonicalName, message);
 		}
 
 		private void StartGameReceived(HostName remoteAddress, NetworkMessagePacket message)
@@ -394,7 +269,6 @@ namespace UpWords
 			{
 				OnStartGameReceived(remoteAddress.CanonicalName, letters);
 			}
-			AcknowledgedMessage(remoteAddress.CanonicalName, message);
 		}
 
 		private void PlayersTurnDetailsReceived(HostName remoteAddress, NetworkMessagePacket message)
@@ -405,7 +279,6 @@ namespace UpWords
 			{
 				OnPlayersTurnDetailsReceived(remoteAddress.CanonicalName, iPlayersTurnDetails);
 			}
-			AcknowledgedMessage(remoteAddress.CanonicalName, message);
 		}
 		
 	}
