@@ -23,6 +23,8 @@ namespace UpWords
 		public string MachineName { get { return m_machineName; } }
 		public string Username { get { return m_username; } }
 
+		public bool Paused;
+
 		private const string GAME_PORT = "4321";
 		protected const string BROADCAST_IP = "255.255.255.255";
 
@@ -76,29 +78,36 @@ namespace UpWords
 		{
 			try
 			{
-				await System.Threading.Tasks.Task.Delay(TimeSpan.FromSeconds(1));
-
-				lock (m_messageQueueLock)
+				if (!Paused)
 				{
-					NetworkMessage messageToRemove = null;
+					await System.Threading.Tasks.Task.Delay(TimeSpan.FromSeconds(1));
 
-					foreach (NetworkMessage message in m_outstandingMessages)
+					lock (m_messageQueueLock)
 					{
-						if (DateTime.Now.Subtract(message.TimeStamp).TotalSeconds > 3)
-						{
-							SendMessage(message);
+						NetworkMessage messageToRemove = null;
 
-							if (message.MessagePacket.Command == eProtocol.Acknowledge)
+						foreach (NetworkMessage message in m_outstandingMessages)
+						{
+							if (DateTime.Now.Subtract(message.TimeStamp).TotalSeconds > 3)
 							{
-								messageToRemove = message;
+								SendMessage(message);
+
+								if (message.MessagePacket.Command == eProtocol.Acknowledge)
+								{
+									messageToRemove = message;
+								}
 							}
 						}
-					}
 
-					if (messageToRemove != null)
-					{
-						m_outstandingMessages.Remove(messageToRemove);
+						if (messageToRemove != null)
+						{
+							m_outstandingMessages.Remove(messageToRemove);
+						}
 					}
+				}
+				else
+				{
+					await System.Threading.Tasks.Task.Delay(TimeSpan.FromSeconds(5));
 				}
 			}
 			catch (Exception ex)
@@ -111,9 +120,12 @@ namespace UpWords
 
 		protected void AddMessageToQueue(NetworkMessage message)
 		{
-			lock (m_messageQueueLock)
+			if (!Paused)
 			{
-				m_outstandingMessages.Add(message);
+				lock (m_messageQueueLock)
+				{
+					m_outstandingMessages.Add(message);
+				}
 			}
 		}
 

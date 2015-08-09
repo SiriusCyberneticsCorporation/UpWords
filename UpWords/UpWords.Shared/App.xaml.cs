@@ -106,7 +106,6 @@ namespace UpWords
                 // configuring the new page by passing required information as a navigation
                 // parameter
 				if (!rootFrame.Navigate(typeof(MainPage), this))
-				//if (!rootFrame.Navigate(typeof(GamePage), this))
 				{
                     throw new Exception("Failed to create initial page");
                 }
@@ -143,6 +142,8 @@ namespace UpWords
 
             // TODO: Save application state and stop any background activity
             deferral.Complete();
+
+			m_localNetwork.Paused = true;
         }
 
     }

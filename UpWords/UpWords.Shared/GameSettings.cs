@@ -14,7 +14,8 @@ namespace UpWords
 		public bool GameCreated = false;
 		public string CreatorsIpAddress;
 		public string GameTitle;
-		public Dictionary<string, string> PlayersJoined = new Dictionary<string, string>();
+		public PlayerDetails MyDetails = new PlayerDetails();
+		public Dictionary<string, PlayerDetails> PlayersJoined = new Dictionary<string, PlayerDetails>();
 
 		private static GameSettings m_settings = null;
 

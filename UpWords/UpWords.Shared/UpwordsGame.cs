@@ -8,6 +8,9 @@ using Windows.UI.Xaml.Documents;
 using Windows.UI.Xaml.Input;
 using Windows.UI.Xaml.Media;
 
+using System.Threading.Tasks;
+using Windows.Storage.Streams;
+
 namespace UpWords
 {
     public class UpwordsGame
@@ -15,6 +18,7 @@ namespace UpWords
 		public delegate void ShowMessageHandler(string message);
 		public event ShowMessageHandler OnShowMessage;
 		public event ShowMessageHandler TurnIndicator;
+		public event ShowMessageHandler LetterRemaining;
 
 //		public delegate void HideMessageHandler();
 //		public event HideMessageHandler OnHideMessage;
@@ -25,6 +29,7 @@ namespace UpWords
 		public delegate void ShowPlaysHandler(Paragraph title, Paragraph detail);
 		public event ShowPlaysHandler OnDisplayPlays;
 
+		public bool IsYouTurn { get { return m_turnState == eTurnState.PlayersTurn; } }
 		public bool ChangingALetter { get; set; }
 		public List<TileControl> PanelTiles { get { return m_panelTiles; } }
 		
@@ -41,6 +46,7 @@ namespace UpWords
 		private DateTime m_gameStartTime = DateTime.Now;
 		private eTurnState m_turnState = eTurnState.Unknown;
 		private CurrentGame m_currentGame = new CurrentGame();
+		private PlayerDetails m_currentActivePlayer = null;
 		private TileControl[,] m_boardTiles = new TileControl[GRID_SIZE, GRID_SIZE];
 
 		private List<string> m_letterBag = new List<string>();
@@ -51,7 +57,9 @@ namespace UpWords
 		private List<TileControl> m_justPlayedTiles = new List<TileControl>();
 		private List<TileControl> m_panelTiles = new List<TileControl>();
 		private List<TileControl> m_computersTiles = new List<TileControl>();
-		private Dictionary<string, bool> m_activePlayer = new Dictionary<string, bool>();
+		private Dictionary<string, PlayerDetails> m_activePlayer = new Dictionary<string, PlayerDetails>();
+
+		private MediaElement m_beeper = new MediaElement();
 
 		private TileControl m_tileBeingExchanged = null;
 
@@ -59,6 +67,13 @@ namespace UpWords
 		private Image m_gameBoard = null;
 		private Canvas m_tileCanvas = null;
 		private UpwordsNetworking m_localNetwork = null;
+
+		private enum ePlacementMode
+		{
+			Redrawing,
+			UserPlacement,
+			PlacingOpponentTile
+		}
 
 		public UpwordsGame(Grid tilePanel, Image gameBoard, Canvas tileCanvas, UpwordsNetworking localNetwork)
 		{
@@ -80,23 +95,26 @@ namespace UpWords
 
 		public void InitialiseGame()
 		{
+			GameSettings.Settings.MyDetails.ID = Guid.NewGuid();
+			GameSettings.Settings.MyDetails.IpAddress = m_localNetwork.IpAddress;
+			GameSettings.Settings.MyDetails.Machine = m_localNetwork.MachineName;
+			GameSettings.Settings.MyDetails.Name = m_localNetwork.Username;
+			GameSettings.SaveSettings();
+
 			if (GameSettings.Settings.GameCreated)
 			{
-				int player = 0;
-				int startPlayer = GetStartPlayer(GameSettings.Settings.PlayersJoined.Count + 1);
-
 				FillLetterBag();
 				AddLettersToPanel(GetLetters(7));
 
-				m_activePlayer.Add(m_localNetwork.IpAddress, startPlayer == 0);
+				m_activePlayer.Add(m_localNetwork.IpAddress, GameSettings.Settings.MyDetails);
 
 				foreach (string playerIP in GameSettings.Settings.PlayersJoined.Keys)
 				{
 					m_localNetwork.StartGame(playerIP);
-
-					player++;
-					m_activePlayer.Add(playerIP, startPlayer == player);
+					m_activePlayer.Add(playerIP, GameSettings.Settings.PlayersJoined[playerIP]);
 				}
+				
+				SetStartPlayer();
 			}
 			else
 			{
@@ -115,19 +133,12 @@ namespace UpWords
 		void LocalNetwork_OnReadyToStartReceivedReceived(string playersIpAddress)
 		{
 			m_localNetwork.SendLetters(playersIpAddress, GetLetters(7));
-			SetActivePlayer();
+			SendActivePlayer(playersIpAddress);
 		}
 
-		void LocalNetwork_OnSetActivePlayerReceived(bool active)
+		void LocalNetwork_OnSetActivePlayerReceived(PlayerDetails activePlayer)
 		{
-			if (active)
-			{
-				IsPlayersTurn();
-			}
-			else
-			{
-				IsOpponentsTurn();
-			}
+			SetActivePlayer(activePlayer);
 		}
 
 		void LocalNetwork_OnPlayersTurnDetailsReceived(string playersIpAddress, PlayersTurnDetails iPlayersTurnDetails)
@@ -148,11 +159,10 @@ namespace UpWords
 					}
 				}
 				NextActivePlayer();
-				SetActivePlayer();
 			}
 		}
 
-		void LocalNetwork_OnLettersReceived(string serverIP, List<string> letters)
+		void LocalNetwork_OnLettersReceived(string serverIP, GameLetters letters)
 		{
 			if (m_tileBeingExchanged != null)
 			{
@@ -180,11 +190,11 @@ namespace UpWords
 
 			foreach (TileControl tile in m_playedTiles)
 			{
-				PlaceTileOnBoard(tile, tile.GridX, tile.GridY, false);
+				PlaceTileOnBoard(tile, tile.GridX, tile.GridY, ePlacementMode.Redrawing);
 			}
 			foreach (TileControl tile in m_currentWordTiles)
 			{
-				PlaceTileOnBoard(tile, tile.GridX, tile.GridY, false);
+				PlaceTileOnBoard(tile, tile.GridX, tile.GridY, ePlacementMode.Redrawing);
 			}
 
 			foreach (TileControl tile in m_panelTiles)
@@ -233,7 +243,7 @@ namespace UpWords
 					playerToActivate = playerIP;
 					break;
 				}
-				else if (m_activePlayer[playerIP])
+				else if (m_activePlayer[playerIP].Active)
 				{
 					playerToDeactivate = playerIP;
 					activateNext = true;
@@ -242,36 +252,60 @@ namespace UpWords
 
 			if(playerToDeactivate.Length > 0)
 			{
-				m_activePlayer[playerToDeactivate] = false;
+				m_activePlayer[playerToDeactivate].Active = false;
 			}
 			if (playerToActivate.Length > 0)
 			{
-				m_activePlayer[playerToActivate] = true;
+				m_activePlayer[playerToActivate].Active = true;
+				m_currentActivePlayer = m_activePlayer[playerToActivate];
 			}
 			else
 			{
-				m_activePlayer[firstIP] = true;
+				m_activePlayer[firstIP].Active = true;
+				m_currentActivePlayer = m_activePlayer[firstIP];
+			}
+
+			if (m_currentActivePlayer != null)
+			{
+				foreach (string playerIP in m_activePlayer.Keys)
+				{
+					SendActivePlayer(playerIP);
+				}
 			}
 		}
 
-		private void SetActivePlayer()
+		private void SendActivePlayer(string playersIpAddress)
 		{
 			foreach (string playerIP in m_activePlayer.Keys)
 			{
 				if (playerIP == m_localNetwork.IpAddress)
 				{
-					if(m_activePlayer[playerIP])
-					{
-						IsPlayersTurn();
-					}
-					else
-					{
-						IsOpponentsTurn();
-					}
+					SetActivePlayer(m_currentActivePlayer);
 				}
 				else
 				{
-					m_localNetwork.SetActivePlayer(playerIP, m_activePlayer[playerIP]);
+					m_localNetwork.SetActivePlayer(playerIP, m_currentActivePlayer);
+				}
+			}
+		}
+
+		private void SetActivePlayer(PlayerDetails activePlayer)
+		{
+			// If the player is our IP Address AND is active then it is our turn.
+			if (activePlayer.IpAddress == m_localNetwork.IpAddress && activePlayer.Active)
+			{
+				m_turnState = eTurnState.PlayersTurn;
+				if (TurnIndicator != null)
+				{
+					TurnIndicator("Your Turn");
+				}
+			}
+			else
+			{
+				m_turnState = eTurnState.OpponentsTurn;
+				if (TurnIndicator != null)
+				{
+					TurnIndicator("Waiting on " + activePlayer.Name);
 				}
 			}
 		}
@@ -302,7 +336,7 @@ namespace UpWords
 			m_playedTiles.Add(tile);
 			m_boardTiles[tile.GridX, tile.GridY] = tile;
 
-			PlaceTileOnBoard(tile, tileData.GridX, tileData.GridY, false);
+			PlaceTileOnBoard(tile, tileData.GridX, tileData.GridY, ePlacementMode.PlacingOpponentTile);
 		}
 
 		private void AddTileToPanel(string letter, int position)
@@ -325,48 +359,48 @@ namespace UpWords
 			m_panelTiles.Add(tile);
 		}
 
-		public List<string> GetLetters(int numberOfLetters)
+		public GameLetters GetLetters(int numberOfLetters)
 		{
-			List<string> letters = new List<string>();
+			GameLetters letters = new GameLetters();
 
 			numberOfLetters = Math.Min(numberOfLetters, m_letterBag.Count);
 
 			for (int i = 0; i < numberOfLetters; i++)
 			{
-				letters .Add(NextRandomLetter());
+				letters.Letters.Add(NextRandomLetter());
 			}
+			letters.LettersRemaining = m_letterBag.Count;
 
 			return letters;
 		}
 
-		public void AddLettersToPanel(List<string> letters)
+		public void AddLettersToPanel(GameLetters letters)
 		{
-			for (int i = 0; i < letters.Count; i++)
+			for (int i = 0; i < letters.Letters.Count; i++)
 			{
-				AddTileToPanel(letters[i], i);
+				AddTileToPanel(letters.Letters[i], i);
 			}
-		}
-
-		public int GetStartPlayer(int numberOfPlayers)
-		{
-			return m_randomiser.Next(numberOfPlayers);
-		}
-
-		public void IsPlayersTurn()
-		{
-			m_turnState = eTurnState.PlayersTurn;
-			if(TurnIndicator != null)
+			
+			if(LetterRemaining != null)
 			{
-				TurnIndicator("Your Turn");
-			}
+				LetterRemaining(letters.LettersRemaining.ToString() + " letters remaining");
+			}			
 		}
 
-		public void IsOpponentsTurn()
+		public void SetStartPlayer()
 		{
-			m_turnState = eTurnState.OpponentsTurn;
-			if (TurnIndicator != null)
+			int player = 0;
+			int startPlayer = m_randomiser.Next(GameSettings.Settings.PlayersJoined.Count + 1);
+
+			foreach (string playerIP in m_activePlayer.Keys)
 			{
-				TurnIndicator("Waiting on Opponent");
+				m_activePlayer[playerIP].Active = (player == startPlayer);
+
+				if (player == startPlayer)
+				{
+					m_currentActivePlayer = m_activePlayer[playerIP];
+				}
+				player++;
 			}
 		}
 		
@@ -561,7 +595,7 @@ namespace UpWords
 						}
 					}
 
-					PlaceTileOnBoard(draggedItem, gridX, gridY);
+					PlaceTileOnBoard(draggedItem, gridX, gridY, ePlacementMode.UserPlacement);
 				}
 				else
 				{
@@ -587,7 +621,7 @@ namespace UpWords
 				gridY--;
 			}
 			// Move down one if possible.
-			else if (!up && gridY < GRID_SIZE - 1 && m_boardSpaceFilled[gridX, gridY + 1] == 0)
+			else if (!up && gridY + 1 < GRID_SIZE && m_boardSpaceFilled[gridX, gridY + 1] == 0)
 			{
 				gridY++;
 			}
@@ -597,7 +631,7 @@ namespace UpWords
 				gridX--;
 			}
 			// Move right one if possible.
-			else if (!left && gridX < GRID_SIZE - 1 && m_boardSpaceFilled[gridX + 1, gridY] == 0)
+			else if (!left && gridX - 1 < GRID_SIZE && m_boardSpaceFilled[gridX + 1, gridY] == 0)
 			{
 				gridX++;
 			}
@@ -608,19 +642,19 @@ namespace UpWords
 				gridY--;
 			}
 			// Move down and left if possible.
-			else if (left && !up && gridX > 0 && gridY < GRID_SIZE - 1 && m_boardSpaceFilled[gridX - 1, gridY + 1] == 0)
+			else if (left && !up && gridX > 0 && gridY + 1 < GRID_SIZE && m_boardSpaceFilled[gridX - 1, gridY + 1] == 0)
 			{
 				gridX--;
 				gridY++;
 			}
 			// Move up and right if possible.
-			else if (!left && up && gridX < GRID_SIZE - 1 && gridY > 0 && m_boardSpaceFilled[gridX + 1, gridY - 1] == 0)
+			else if (!left && up && gridX + 1 < GRID_SIZE && gridY > 0 && m_boardSpaceFilled[gridX + 1, gridY - 1] == 0)
 			{
 				gridX++;
 				gridY--;
 			}
 			// Move down and right if possible.
-			else if (!left && !up && gridX < GRID_SIZE - 1 && gridY < GRID_SIZE - 1 && m_boardSpaceFilled[gridX + 1, gridY + 1] == 0)
+			else if (!left && !up && gridX + 1 < GRID_SIZE && gridY + 1 < GRID_SIZE && m_boardSpaceFilled[gridX + 1, gridY + 1] == 0)
 			{
 				gridX++;
 				gridY++;
@@ -641,9 +675,9 @@ namespace UpWords
 						}
 					}
 				}
-				if (!spaceFound && !up && gridY < 13)
+				if (!spaceFound && !up && gridY + 1 < GRID_SIZE)
 				{
-					for (int row = gridY; row < GRID_SIZE - 1; row++)
+					for (int row = gridY; row + 1 < GRID_SIZE; row++)
 					{
 						if (m_boardSpaceFilled[gridX, row] == 0)
 						{
@@ -665,9 +699,9 @@ namespace UpWords
 						}
 					}
 				}
-				if (!spaceFound && !left && gridX < 13)
+				if (!spaceFound && !left && gridX + 1 < GRID_SIZE)
 				{
-					for (int column = gridX; column < GRID_SIZE - 1; column++)
+					for (int column = gridX; column + 1 < GRID_SIZE; column++)
 					{
 						if (m_boardSpaceFilled[column, gridY] == 0)
 						{
@@ -835,7 +869,7 @@ namespace UpWords
 		}
 
 
-		private void PlaceTileOnBoard(TileControl draggedItem, int gridX, int gridY, bool setLayer = true)
+		private void PlaceTileOnBoard(TileControl draggedItem, int gridX, int gridY, ePlacementMode placement)
 		{
 			TranslateTransform tileRenderTransform = draggedItem.RenderTransform as TranslateTransform;
 
@@ -843,13 +877,19 @@ namespace UpWords
 			Rect boardRect = boardTransform.TransformBounds(new Rect(0, 0, m_gameBoard.ActualWidth, m_gameBoard.ActualHeight));
 			Point positionOfBoard = boardTransform.TransformPoint(new Point(0, 0));
 
-			tileRenderTransform.X = positionOfBoard.X + (m_tileSize * gridX);// +boardRect.Width * 0.01 - (boardRect.Width * 0.005 * draggedItem.Layer);
-			tileRenderTransform.Y = positionOfBoard.Y + (m_tileSize * gridY);// +boardRect.Height * 0.01 - (boardRect.Height * 0.005 * draggedItem.Layer);
-
-			if (draggedItem.TileStatus != eTileState.JustPlayed &&
-				draggedItem.GridY != ON_PANEL && draggedItem.GridX >= 0 && draggedItem.GridY >= 0)
+			if (placement == ePlacementMode.UserPlacement)
 			{
-				m_boardSpaceFilled[draggedItem.GridX, draggedItem.GridY]--;
+				// If the tile is being moved around the board then decrement the tile count in the square it left.
+				if (draggedItem.GridY != ON_PANEL && draggedItem.GridX >= 0 && draggedItem.GridY >= 0)
+				{
+					m_boardSpaceFilled[draggedItem.GridX, draggedItem.GridY]--;
+				}
+				m_boardSpaceFilled[gridX, gridY] = Math.Max(1, Math.Min(5, m_boardSpaceFilled[gridX, gridY] + 1));
+				draggedItem.Layer = m_boardSpaceFilled[gridX, gridY];
+			}
+			else if(placement == ePlacementMode.PlacingOpponentTile)
+			{
+				m_boardSpaceFilled[gridX, gridY] = draggedItem.Layer;
 			}
 
 			draggedItem.Width = m_tileSize;
@@ -858,13 +898,8 @@ namespace UpWords
 			draggedItem.GridY = gridY;
 			draggedItem.Visibility = Windows.UI.Xaml.Visibility.Visible;
 
-			m_boardSpaceFilled[gridX, gridY]++;
-
-			if (setLayer)
-			{
-				draggedItem.Layer = m_boardSpaceFilled[gridX, gridY];
-			}
-
+			tileRenderTransform.X = positionOfBoard.X + (m_tileSize * gridX) - (boardRect.Width * 0.005 * draggedItem.Layer);// +boardRect.Width * 0.01 - (boardRect.Width * 0.005 * draggedItem.Layer);
+			tileRenderTransform.Y = positionOfBoard.Y + (m_tileSize * gridY) - (boardRect.Height * 0.005 * draggedItem.Layer);// +boardRect.Height * 0.01 - (boardRect.Height * 0.005 * draggedItem.Layer);
 			Canvas.SetZIndex(draggedItem, draggedItem.Layer);
 
 			if (draggedItem.TileStatus == eTileState.OnPlayerPanel)
@@ -916,7 +951,7 @@ namespace UpWords
 
 			if (playedWord != null)
 			{
-				if (playedWord.Word.Length > 1)
+				if (playedWord.Word.Length > 1 && playedWord.Word != "QU")
 				{
 					playedWords.Add(playedWord);
 				}
@@ -946,12 +981,6 @@ namespace UpWords
 			{
 				if (firstTile.GridX == sourceList[index].GridX)
 				{
-					if (firstTile.GridX != sourceList[index].GridX)
-					{
-						ShowMessage("The tiles are not in a line!");
-						destinationList = null;
-						return false;
-					}
 					horizontal = false;
 					for (sortIndex = 0; sortIndex < destinationList.Count; sortIndex++)
 					{
@@ -964,12 +993,6 @@ namespace UpWords
 				}
 				else
 				{
-					if (firstTile.GridY != sourceList[index].GridY)
-					{
-						ShowMessage("The tiles are not in a line!");
-						destinationList = null;
-						return false;
-					}
 					horizontal = true;
 					for (sortIndex = 0; sortIndex < destinationList.Count; sortIndex++)
 					{
@@ -1022,7 +1045,7 @@ namespace UpWords
 						{
 							ShowMessage("There seems to be a gap in your word!");
 							wordCreated = null; ;
-							break;
+							return null;
 						}
 					}
 				}
@@ -1085,7 +1108,7 @@ namespace UpWords
 						{
 							ShowMessage("There seems to be a gap in your word!");
 							wordCreated = null;
-							break;
+							return null;
 						}
 					}
 				}
@@ -1139,13 +1162,13 @@ namespace UpWords
 						Y++;
 					}
 
-					if (wordCreated.Word.Length > 1)
+					if (wordCreated.Word.Length > 1 && wordCreated.Word != "QU")
 					{
 						playedWords.Add(wordCreated);
 					}
 				}
 				// If there are letters on the board below the played tile then start with the played tile and go from there.
-				else if (tile.GridY < GRID_SIZE - 1 && m_boardTiles[tile.GridX, tile.GridY + 1] != null)
+				else if (tile.GridY + 1 < GRID_SIZE && m_boardTiles[tile.GridX, tile.GridY + 1] != null)
 				{
 					int Y = tile.GridY + 1;
 					UpWord wordCreated = new UpWord();
@@ -1159,7 +1182,7 @@ namespace UpWords
 						Y++;
 					}
 
-					if (wordCreated.Word.Length > 1)
+					if (wordCreated.Word.Length > 1 && wordCreated.Word != "QU")
 					{
 						playedWords.Add(wordCreated);
 					}
@@ -1196,13 +1219,13 @@ namespace UpWords
 						X++;
 					}
 
-					if (wordCreated.Word.Length > 1)
+					if (wordCreated.Word.Length > 1 && wordCreated.Word != "QU")
 					{
 						playedWords.Add(wordCreated);
 					}
 				}
 				// If there are letters on the board to the right of the played tile then start with the played tile and go from there.
-				else if (tile.GridX < GRID_SIZE - 1 && m_boardTiles[tile.GridX + 1, tile.GridY] != null)
+				else if (tile.GridX + 1 < GRID_SIZE && m_boardTiles[tile.GridX + 1, tile.GridY] != null)
 				{
 					int X = tile.GridX + 1;
 					UpWord wordCreated = new UpWord();
@@ -1216,7 +1239,7 @@ namespace UpWords
 						X++;
 					}
 
-					if (wordCreated.Word.Length > 1)
+					if (wordCreated.Word.Length > 1 && wordCreated.Word != "QU")
 					{
 						playedWords.Add(wordCreated);
 					}
@@ -1252,12 +1275,26 @@ namespace UpWords
 			}
 			else
 			{
+				int firstTileX = m_currentWordTiles[0].GridX;
+				int firstTileY = m_currentWordTiles[0].GridY;
+				bool allTilesHorizontal = true;
+				bool allTilesVertical = true;
+				bool coversIdenticalLetter = false;
 				bool touchesExistingWord = false;
+				string identicalLetter = string.Empty;
 				List<TileControl> coveredTiles = new List<TileControl>();
 				List<TileControl> sortedCoveredTiles = new List<TileControl>();
 
 				foreach (TileControl tile in m_currentWordTiles)
 				{
+					if(tile.GridX != firstTileX)
+					{
+						allTilesVertical = false;
+					}
+					if (tile.GridY != firstTileY)
+					{
+						allTilesHorizontal = false;
+					}
 					// Gather a list of all covered tiles to check if an entire word has been covered.
 					if (m_boardTiles[tile.GridX, tile.GridY] != null)									// Space contains a letter.
 					{
@@ -1272,53 +1309,103 @@ namespace UpWords
 					{
 						touchesExistingWord = true;
 					}
+					// Check that the letter covered is not the same as the letter placed.
+					if (m_boardTiles[tile.GridX, tile.GridY] != null && 
+						m_boardTiles[tile.GridX, tile.GridY].Letter == tile.Letter)
+					{
+						coversIdenticalLetter = true;
+						identicalLetter = tile.Letter;
+					}
 				}
-				if (!touchesExistingWord)
+
+				if (!allTilesHorizontal && allTilesVertical)
+				{
+					ShowMessage("The tiles are not in a line!");
+					return false;
+				}
+				else if (!touchesExistingWord)
 				{
 					ShowMessage("Your word must interact with an existing word.");
 					return false;
 				}
+				else if (coversIdenticalLetter)
+				{
+					ShowMessage("Your '" + identicalLetter + "' covers an existing '" + identicalLetter + "'.");
+					return false;
+				}
 
-				if (coveredTiles.Count > 0)
+				if (coveredTiles.Count > 1)
 				{
 					bool horizontal = SortTiles(coveredTiles, ref sortedCoveredTiles);
 					bool entireWordCovered = true;
 					TileControl firstTile = sortedCoveredTiles[0];
 					TileControl lastTile = sortedCoveredTiles[sortedCoveredTiles.Count - 1];
 
+					// Check for entire word coverage horizontally.
 					if (horizontal)
 					{
-						if (firstTile.GridX > 0)
+						// If there is a letter before the first covered letter then the entire word is not covered.
+						if (firstTile.GridX > 0 && m_boardTiles[firstTile.GridX - 1, firstTile.GridY] != null)
 						{
-							if (m_boardTiles[firstTile.GridX - 1, firstTile.GridY] != null)
-							{
-								entireWordCovered = false;
-							}
+							entireWordCovered = false;
 						}
-						if (firstTile.GridX < GRID_SIZE - 2)
+						// If there is a letter after the last covered letter then the entire word is not covered.
+						else if (lastTile.GridX + 1 < GRID_SIZE  && m_boardTiles[lastTile.GridX + 1, lastTile.GridY] != null)
 						{
-							if (m_boardTiles[firstTile.GridX + 1, firstTile.GridY] != null)
+							entireWordCovered = false;
+						}
+						// Otherwise check all letters in between
+						else
+						{
+							for (int index = 1; index < sortedCoveredTiles.Count; index++)
 							{
-								entireWordCovered = false;
+								// If there is a gap in the placed letters then an entire word is not covered.
+								if (sortedCoveredTiles[index].GridX - sortedCoveredTiles[index-1].GridX > 1)
+								{
+									entireWordCovered = false;
+									break;
+								}
+								// If the space does not contain a letter then an entire word is not covered.
+								else if (m_boardTiles[sortedCoveredTiles[index].GridX, sortedCoveredTiles[index].GridY] == null)
+								{
+									entireWordCovered = false;
+									break;
+								}
 							}
 						}
 					}
+					// Check for entire work coverage vertically.
 					else
 					{
-						if (firstTile.GridY > 0)
+						// If there is a letter above the first covered letter then the entire word is not covered.
+						if (firstTile.GridY > 0 && m_boardTiles[firstTile.GridX, firstTile.GridY - 1] != null)
 						{
-							if (m_boardTiles[firstTile.GridX, firstTile.GridY - 1] != null)
-							{
-								entireWordCovered = false;
-							}
+							entireWordCovered = false;
 						}
-						if (firstTile.GridY < GRID_SIZE - 2)
+						// If there is a letter below the last covered letter then the entire word is not covered.
+						else if (lastTile.GridY + 1 < GRID_SIZE && m_boardTiles[lastTile.GridX, lastTile.GridY + 1] != null)
 						{
-							if (m_boardTiles[firstTile.GridX, firstTile.GridY + 1] != null)
-							{
-								entireWordCovered = false;
-							}
+							entireWordCovered = false;
 						}
+						// Otherwise check all letters in between
+						else
+						{
+							for (int index = 1; index < sortedCoveredTiles.Count; index++)
+							{
+								// If there is a gap in the placed letters then an entire word is not covered.
+								if (sortedCoveredTiles[index].GridY - sortedCoveredTiles[index - 1].GridY > 1)
+								{
+									entireWordCovered = false;
+									break;
+								}
+								// If the space does not contain a letter then an entire word is not covered.
+								else if (m_boardTiles[sortedCoveredTiles[index].GridX, sortedCoveredTiles[index].GridY] == null)
+								{
+									entireWordCovered = false;
+									break;
+								}
+							}
+						}						
 					}
 
 					if (entireWordCovered)
@@ -1410,7 +1497,6 @@ namespace UpWords
 
 						AddLettersToPanel(GetLetters(replacementTiles));
 						NextActivePlayer();
-						SetActivePlayer();
 					}
 					else
 					{
@@ -1452,7 +1538,7 @@ namespace UpWords
 					message += playedWord.Word;
 				}
 				message = "Scored " + iPlayersTurnDetails.Score.ToString() + 
-						  " points from the word" + (iPlayersTurnDetails.PlayedWords.Count > 1 ? "s " : " ") + message +
+						  " points from:" + (iPlayersTurnDetails.PlayedWords.Count > 1 ? "s " : " ") + message +
 						  ".\r\n";
 
 				Paragraph detail = new Windows.UI.Xaml.Documents.Paragraph();
@@ -1496,5 +1582,42 @@ namespace UpWords
 			}
 		}
 
+		public async Task<IRandomAccessStream> BeepBeep(int Amplitude, int Frequency, int Duration)
+		{
+			double A = ((Amplitude * (System.Math.Pow(2, 15))) / 1000) - 1;
+			double DeltaFT = 2 * Math.PI * Frequency / 44100.0;
+
+			int Samples = 441 * Duration / 10;
+			int Bytes = Samples * 4;
+			int[] Hdr = { 0X46464952, 36 + Bytes, 0X45564157, 0X20746D66, 16, 0X20001, 44100, 176400, 0X100004, 0X61746164, Bytes };
+
+			InMemoryRandomAccessStream ims = new InMemoryRandomAccessStream();
+			IOutputStream outStream = ims.GetOutputStreamAt(0);
+			DataWriter dw = new DataWriter(outStream);
+			dw.ByteOrder = ByteOrder.LittleEndian;
+
+			for (int I = 0; I < Hdr.Length; I++)
+			{
+				dw.WriteInt32(Hdr[I]);
+			}
+			for (int T = 0; T < Samples; T++)
+			{
+				short Sample = System.Convert.ToInt16(A * Math.Sin(DeltaFT * T));
+				dw.WriteInt16(Sample);
+				dw.WriteInt16(Sample);
+			}
+			await dw.StoreAsync();
+			await outStream.FlushAsync();
+			return ims;
+		}
+
+		/*
+		private async void Button_Click()
+		{			
+			IRandomAccessStream beepStream = await BeepBeep(200, 3000, 250);
+			Beeper.SetSource(beepStream, string.Empty);
+			Beeper.Play();
+		}
+		*/
 	}
 }

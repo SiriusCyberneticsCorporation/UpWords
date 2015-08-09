@@ -20,17 +20,17 @@ namespace UpWords
 		public delegate void ExchangeLetterHandler(string senderIP, TileDetails letter);
 		public event ExchangeLetterHandler OnLetterExchange;
 
-		public delegate void ActivePlayerHandler(bool active);
+		public delegate void ActivePlayerHandler(PlayerDetails playersDetails);
 		public event ActivePlayerHandler OnSetActivePlayerReceived;
 
 		public delegate void SimpleIPHandler(string senderIpAddress);
 		public event SimpleIPHandler OnReadyToStartReceivedReceived;
 		public event SimpleIPHandler OnStartGameReceived;
 
-		public delegate void NewLettersHandler(string serverIP, List<string> letters);
+		public delegate void NewLettersHandler(string serverIP, GameLetters letters);
 		public event NewLettersHandler OnLettersReceived;
 
-		public delegate void GameJoinedHandler(string playersIpAddress, string playersDetails);
+		public delegate void GameJoinedHandler(string playersIpAddress, PlayerDetails playersDetails);
 		public event GameJoinedHandler OnGameJoinedReceived;
 
 		public delegate void TurnDetailsHandler(string playersIpAddress, PlayersTurnDetails iPlayersTurnDetails);
@@ -71,9 +71,9 @@ namespace UpWords
 			AddMessageToQueue(message);
 		}
 
-		public void SetActivePlayer(string playerIP, bool active)
+		public void SetActivePlayer(string playerIP, PlayerDetails activePlayer)
 		{
-			string messageText = Serialiser.SerializeToXml<bool>(active);
+			string messageText = Serialiser.SerializeToXml<PlayerDetails>(activePlayer);
 			NetworkMessage message = new NetworkMessage()
 			{
 				RecipientsIP = playerIP,
@@ -117,9 +117,9 @@ namespace UpWords
 			AddMessageToQueue(message);
 		}
 
-		public void SendLetters(string playerIP, List<string> letters)
+		public void SendLetters(string playerIP, GameLetters letters)
 		{
-			string messageText = Serialiser.SerializeToXml<List<string>>(letters);
+			string messageText = Serialiser.SerializeToXml<GameLetters>(letters);
 			NetworkMessage message = new NetworkMessage()
 			{
 				RecipientsIP = playerIP,
@@ -133,17 +133,18 @@ namespace UpWords
 			AddMessageToQueue(message);
 		}
 
-		public void JoinGame(string creatorsIpAddress)
+		public void JoinGame(string creatorsIpAddress, PlayerDetails activePlayer)
 		{
 			if (!QueueContainsMessage(creatorsIpAddress, eProtocol.GameJoined))
 			{
+				string messageText = Serialiser.SerializeToXml<PlayerDetails>(activePlayer);
 				NetworkMessage message = new NetworkMessage()
 				{
 					RecipientsIP = creatorsIpAddress,
 					MessagePacket = new NetworkMessagePacket()
 					{
 						Command = eProtocol.GameJoined,
-						MessageText = Username + " on " + MachineName
+						MessageText = messageText
 					}
 				};
 
@@ -270,25 +271,12 @@ namespace UpWords
 
 		private void GameJoinedReceived(HostName remoteAddress, NetworkMessagePacket message)
 		{
+			PlayerDetails activePlayer = Serialiser.DeserializeFromXml<PlayerDetails>(message.MessageText);
+
 			if (OnGameJoinedReceived != null)
 			{
-				OnGameJoinedReceived(remoteAddress.CanonicalName, message.MessageText);
+				OnGameJoinedReceived(remoteAddress.CanonicalName, activePlayer);
 			}
-			/*
-			Acknowledgement iAcknowledgement = new Acknowledgement()
-			{
-				Command = eProtocol.GameJoined,
-				Message = "Waiting for other players"
-			};
-
-			NetworkMessagePacket iNetworkMessagePacket = new NetworkMessagePacket()
-			{
-				Command = eProtocol.Acknowledge,
-				MessageText = Serialiser.SerializeToXml<Acknowledgement>(iAcknowledgement)
-			};
-
-			SendMessage(remoteAddress.CanonicalName, iNetworkMessagePacket);
-			*/
 		}
 
 		private void ReadyToStartReceived(HostName remoteAddress, NetworkMessagePacket message)
@@ -301,7 +289,7 @@ namespace UpWords
 
 		private void LettersReceived(HostName remoteAddress, NetworkMessagePacket message)
 		{
-			List<string> letters = Serialiser.DeserializeFromXml<List<string>>(message.MessageText);
+			GameLetters letters = Serialiser.DeserializeFromXml<GameLetters>(message.MessageText);
 
 			if (OnLettersReceived != null)
 			{
@@ -311,11 +299,11 @@ namespace UpWords
 
 		private void SetActivePlayerReceived(HostName remoteAddress, NetworkMessagePacket message)
 		{
-			bool active = Serialiser.DeserializeFromXml<bool>(message.MessageText);
+			PlayerDetails activePlayer = Serialiser.DeserializeFromXml<PlayerDetails>(message.MessageText);
 
 			if (OnSetActivePlayerReceived != null)
 			{
-				OnSetActivePlayerReceived(active);
+				OnSetActivePlayerReceived(activePlayer);
 			}
 		}
 

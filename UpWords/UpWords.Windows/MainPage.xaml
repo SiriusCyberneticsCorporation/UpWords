@@ -98,6 +98,8 @@
 			<ListView x:Name="AvailableGamesListView" Margin="0" Grid.Row="1" Background="#FF3E3232" BorderBrush="White" SelectionChanged="AvailableGamesListView_SelectionChanged"/>
 
 		</Grid>
-		<TextBlock x:Name="ErrorMessageTextBlock" Grid.Column="1" Margin="0,107,0,0" TextWrapping="Wrap" Text="TextBlock" VerticalAlignment="Top" FontSize="24" Grid.ColumnSpan="2"/>
+		<TextBlock x:Name="ErrorMessageTextBlock" Grid.Column="1" Margin="0,107,0,0" TextWrapping="Wrap" Text="" VerticalAlignment="Top" FontSize="24" Grid.ColumnSpan="2"/>
+		<MediaElement x:Name="Beeper"></MediaElement>
+		<TextBox x:Name="PlayerMessageTextBlock" HorizontalAlignment="Center" Margin="0" TextWrapping="Wrap" Text="TextBox" VerticalAlignment="Center" Grid.RowSpan="3" Grid.ColumnSpan="4" Background="#7FFFFFFF" FontSize="36" Foreground="Black" Visibility="Collapsed"/>
 	</Grid>
 </Page>

@@ -68,6 +68,7 @@ namespace UpWords
 				if (!GameSettings.Settings.GameCreated)
 				{
 					AvailableGamesListView.Items.Add(gameInformation.GameTitle);
+					CreateGameButton.IsEnabled = false;
 				}
 			}
 		}
@@ -89,12 +90,13 @@ namespace UpWords
 
 		}
 
-		void NetworkCommunications_OnGameJoinedReceived(string playersIpAddress, string playersDetails)
+		void NetworkCommunications_OnGameJoinedReceived(string playersIpAddress, PlayerDetails playersDetails)
 		{
 			GameSettings.Settings.PlayersJoined.Add(playersIpAddress, playersDetails);
 			GameSettings.SaveSettings();
-			
-			AvailableGamesListView.Items.Add(playersDetails);
+
+			AvailableGamesListView.Items.Add(playersDetails.Name + " on " + playersDetails.Machine);
+			StartGameButton.IsEnabled = true;
 		}
 
 		private void CreateGameButton_Click(object sender, RoutedEventArgs e)
@@ -114,6 +116,7 @@ namespace UpWords
 				ListTitleTextBlock.Text = "Players Joined";
 				CreateGameButton.IsEnabled = false;
 				StartGameButton.Visibility = Windows.UI.Xaml.Visibility.Visible;
+				StartGameButton.IsEnabled = false;
 			}
 		}
 
@@ -131,11 +134,15 @@ namespace UpWords
 			{
 				string gameTitle = AvailableGamesListView.SelectedItem as string;
 
-				m_parentClass.NetworkCommunications.JoinGame(m_knownGames[gameTitle]);
+				m_parentClass.NetworkCommunications.JoinGame(m_knownGames[gameTitle], GameSettings.Settings.MyDetails);
 
 				GameSettings.Settings.GameCreated = false;
 				GameSettings.Settings.CreatorsIpAddress = m_knownGames[gameTitle];
 				GameSettings.SaveSettings();
+				
+				JoinGameButton.IsEnabled = false;
+				PlayerMessageTextBlock.Text = "Waiting for " + gameTitle + " to start the game.";
+				PlayerMessageTextBlock.Visibility = Windows.UI.Xaml.Visibility.Visible;
 			}
 		}
 

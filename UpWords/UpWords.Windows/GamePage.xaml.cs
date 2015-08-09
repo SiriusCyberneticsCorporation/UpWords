@@ -46,7 +46,8 @@ namespace UpWords
 				m_gameInstance.OnShowMessage += GameInstance_OnScreenMessage;
 				m_gameInstance.OnChangingALetter += GameInstance_OnChangingALetter;
 				m_gameInstance.OnDisplayPlays += GameInstance_OnDisplayPlays;
-				m_gameInstance.TurnIndicator += m_gameInstance_TurnIndicator;
+				m_gameInstance.TurnIndicator += GameInstance_TurnIndicator;
+				m_gameInstance.LetterRemaining += GameInstance_LetterRemaining;
 
 				m_gameInstance.InitialiseGame();
 
@@ -56,11 +57,6 @@ namespace UpWords
 			{
 				MessageTextBox.Text = "Failed to start!!";
 			}
-		}
-
-		void m_gameInstance_TurnIndicator(string message)
-		{
-			TurnIndicatorTextBlock.Text = message;
 		}
 
 		private void MainGrid_Loaded(object sender, RoutedEventArgs e)
@@ -97,6 +93,20 @@ namespace UpWords
 		{
 			PlaysRichTextBlock.Blocks.Insert(0, detail);
 			PlaysRichTextBlock.Blocks.Insert(0, title);
+		}
+
+		void GameInstance_TurnIndicator(string message)
+		{
+			TurnIndicatorTextBlock.Text = message;
+			SubmitButton.IsEnabled = m_gameInstance.IsYouTurn;
+			ChangeLetterButton.IsEnabled = m_gameInstance.IsYouTurn;
+			RecallLettersButton.IsEnabled = m_gameInstance.IsYouTurn;
+			SkipTurnButton.IsEnabled = m_gameInstance.IsYouTurn;
+		}
+
+		void GameInstance_LetterRemaining(string message)
+		{
+			TileRemainingTextBlock.Text = message;
 		}
 
 		private void ShowMessage(string message)
@@ -160,6 +170,11 @@ namespace UpWords
 		}
 
 		#endregion Button events.
+
+		private void MessageTextBox_Tapped(object sender, TappedRoutedEventArgs e)
+		{
+			MessageTextBox.Visibility = Windows.UI.Xaml.Visibility.Collapsed;
+		}
 
 	}
 }
