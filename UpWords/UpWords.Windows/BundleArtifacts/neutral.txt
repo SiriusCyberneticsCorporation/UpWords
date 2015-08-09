@@ -1,0 +1,4 @@
+MainPackage=C:\Programming\Rism\UpWords\UpWords\UpWords.Windows\bin\Debug\UpWords.Windows_1.0.0.1_Bundle\UpWords.Windows_1.0.0.1_AnyCPU_Debug.appx
+SymbolPackage=C:\Programming\Rism\UpWords\UpWords\UpWords.Windows\AppPackages\UpWords.Windows_1.0.0.1_Debug_Test\UpWords.Windows_1.0.0.1_AnyCPU_Debug.appxsym
+ResourcePack=C:\Programming\Rism\UpWords\UpWords\UpWords.Windows\bin\Debug\UpWords.Windows_1.0.0.1_Bundle\UpWords.Windows_1.0.0.1_scale-140.appx
+ResourcePack=C:\Programming\Rism\UpWords\UpWords\UpWords.Windows\bin\Debug\UpWords.Windows_1.0.0.1_Bundle\UpWords.Windows_1.0.0.1_scale-180.appx
