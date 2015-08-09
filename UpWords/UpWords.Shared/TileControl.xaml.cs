@@ -31,13 +31,13 @@ namespace UpWords
 			set
 			{
 				m_tileDetails.Layer = value;
-				if (m_tileDetails.Layer < 1)
+				if (m_tileDetails.Layer < 2)
 				{
 					TileLayer.Visibility = Windows.UI.Xaml.Visibility.Collapsed;
 				}
 				else
 				{
-					TileLayer.Text = (m_tileDetails.Layer + 1).ToString();
+					TileLayer.Text = (m_tileDetails.Layer).ToString();
 					TileLayer.Visibility = Windows.UI.Xaml.Visibility.Visible;
 				}
 			}
@@ -92,7 +92,11 @@ namespace UpWords
 		{
 			this.InitializeComponent();
 
-			m_tileDetails = tileData;
+			Letter = tileData.Letter;
+			GridX = tileData.GridX;
+			GridY = tileData.GridY;
+			Layer = tileData.Layer;
+			TileStatus = tileData.TileStatus;
 
 			TileLetter.Text = Letter;
 		}

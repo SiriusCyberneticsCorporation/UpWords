@@ -10,13 +10,15 @@ namespace UpWords
 	public enum eProtocol
 	{
 		Acknowledge,
+		ExchangeLetter,
 		GameCreated,
 		GameCancelled,
 		GameJoined,
+		PlayersTurnDetails,
+		ReadyToStart,
 		SendLetters,
 		SetActivePlayer,
 		StartGame,
-		PlayersTurnDetails,
 	}
 
 	public enum eTileState

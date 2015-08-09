@@ -26,8 +26,6 @@ namespace UpWords
 		public UpwordsNetworking NetworkCommunications { get { return m_localNetwork; } }
 		private UpwordsNetworking m_localNetwork = null;
 
-		public List<string> StartingLetters;
-
 #if WINDOWS_PHONE_APP
         private TransitionCollection transitions;
 #endif
@@ -58,6 +56,8 @@ namespace UpWords
 #endif
 			m_localNetwork = new UpwordsNetworking();
 
+			// TODO - handle ongoing game.
+			GameSettings.Settings.TotalScore = 0;
 			GameSettings.Settings.GameCreated = false;
 			GameSettings.Settings.CreatorsIpAddress = "";
 			GameSettings.Settings.GameTitle = "";

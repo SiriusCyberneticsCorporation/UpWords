@@ -10,6 +10,7 @@ namespace UpWords
 {
     public class GameSettings
     {
+		public int TotalScore = 0;
 		public bool GameCreated = false;
 		public string CreatorsIpAddress;
 		public string GameTitle;

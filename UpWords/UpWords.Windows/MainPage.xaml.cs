@@ -72,11 +72,10 @@ namespace UpWords
 			}
 		}
 
-		void NetworkCommunications_OnStartGameReceived(string serverIP, List<string> letters)
+		void NetworkCommunications_OnStartGameReceived(string serverIP)
 		{
 			if (GameSettings.Settings.CreatorsIpAddress == serverIP)
 			{
-				m_parentClass.StartingLetters = letters;
 				Frame.Navigate(typeof(GamePage), m_parentClass);
 			}
 		}

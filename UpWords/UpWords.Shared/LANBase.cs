@@ -9,6 +9,9 @@ using Windows.Networking.Connectivity;
 using Windows.Networking.Sockets;
 using Windows.Storage.Streams;
 
+using Windows.ApplicationModel.Core;
+using Windows.UI.Core;
+
 namespace UpWords
 {
     public abstract class LANBase
@@ -75,7 +78,7 @@ namespace UpWords
 			{
 				await System.Threading.Tasks.Task.Delay(TimeSpan.FromSeconds(1));
 
-				//lock (m_messageQueueLock)
+				lock (m_messageQueueLock)
 				{
 					NetworkMessage messageToRemove = null;
 
@@ -83,7 +86,7 @@ namespace UpWords
 					{
 						if (DateTime.Now.Subtract(message.TimeStamp).TotalSeconds > 3)
 						{
-							await SendMessage(message);
+							SendMessage(message);
 
 							if (message.MessagePacket.Command == eProtocol.Acknowledge)
 							{
@@ -170,7 +173,13 @@ namespace UpWords
 			}
 		}
 
-		public async Task SendMessage(NetworkMessage message)
+		private async void SendMessage(NetworkMessage message)
+		{
+			await CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync
+				(CoreDispatcherPriority.Normal, () => { SendMessageAsync(message); });
+		}
+
+		public async void SendMessageAsync(NetworkMessage message)
 		{
 			try
 			{
@@ -208,8 +217,8 @@ namespace UpWords
 					{
 						m_recentMessages.Push(message.ID);
 
-						await Windows.ApplicationModel.Core.CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync
-							(Windows.UI.Core.CoreDispatcherPriority.Normal, () =>
+						await CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync
+							(CoreDispatcherPriority.Normal, () =>
 							{
 								DecodeMessage(args.RemoteAddress, message);
 							});
@@ -225,17 +234,20 @@ namespace UpWords
 
 		private void AcknowledgedMessage(string recipientsIP, NetworkMessagePacket messagePacket)
 		{
-			NetworkMessage message = new NetworkMessage()
+			if (messagePacket.Command != eProtocol.Acknowledge)
 			{
-				RecipientsIP = recipientsIP,
-				MessagePacket = new NetworkMessagePacket()
+				NetworkMessage message = new NetworkMessage()
 				{
-					ID = messagePacket.ID,
-					Command = eProtocol.Acknowledge
-				}
-			};
+					RecipientsIP = recipientsIP,
+					MessagePacket = new NetworkMessagePacket()
+					{
+						ID = messagePacket.ID,
+						Command = eProtocol.Acknowledge
+					}
+				};
 
-			AddMessageToQueue(message);
+				AddMessageToQueue(message);
+			}
 		}
 
 		public string CurrentIPAddress()

@@ -67,16 +67,18 @@ namespace UpWords
 			m_tileCanvas = tileCanvas;
 			m_localNetwork = localNetwork;
 
+			m_localNetwork.OnReadyToStartReceivedReceived += LocalNetwork_OnReadyToStartReceivedReceived;
 			m_localNetwork.OnSetActivePlayerReceived += LocalNetwork_OnSetActivePlayerReceived;
 			m_localNetwork.OnPlayersTurnDetailsReceived += LocalNetwork_OnPlayersTurnDetailsReceived;
 			m_localNetwork.OnLettersReceived += LocalNetwork_OnLettersReceived;
+			m_localNetwork.OnLetterExchange += LocalNetwork_OnLetterExchange;
 
 			m_randomiser = new Random((int)DateTime.Now.TimeOfDay.TotalSeconds);
 
 			ReadWords();
 		}
 
-		public void InitialiseGame(List<string> startingLetters)
+		public void InitialiseGame()
 		{
 			if (GameSettings.Settings.GameCreated)
 			{
@@ -90,17 +92,16 @@ namespace UpWords
 
 				foreach (string playerIP in GameSettings.Settings.PlayersJoined.Keys)
 				{
-					m_localNetwork.StartGame(playerIP, GetLetters(7));
+					m_localNetwork.StartGame(playerIP);
 
 					player++;
 					m_activePlayer.Add(playerIP, startPlayer == player);
 				}
-
-				SetActivePlayer();
 			}
 			else
 			{
-				AddLettersToPanel(startingLetters);
+				// Let the game controller know we are ready to start.
+				m_localNetwork.SendReadyToStart(GameSettings.Settings.CreatorsIpAddress);
 			}
 		}
 
@@ -108,6 +109,13 @@ namespace UpWords
 		{
 			StorageFile wordsFile = await StorageFile.GetFileFromApplicationUriAsync(new Uri("ms-appx:///Assets/Words.txt", UriKind.Absolute));
 			m_words = await FileIO.ReadLinesAsync(wordsFile);
+		}
+
+
+		void LocalNetwork_OnReadyToStartReceivedReceived(string playersIpAddress)
+		{
+			m_localNetwork.SendLetters(playersIpAddress, GetLetters(7));
+			SetActivePlayer();
 		}
 
 		void LocalNetwork_OnSetActivePlayerReceived(bool active)
@@ -136,7 +144,7 @@ namespace UpWords
 					}
 					else if (iPlayersTurnDetails.LettersPlayed.Count < 7)
 					{
-						m_localNetwork.SendLetters(playerIP, GetLetters(7 - iPlayersTurnDetails.LettersPlayed.Count));
+						m_localNetwork.SendLetters(playerIP, GetLetters(iPlayersTurnDetails.LettersPlayed.Count));
 					}
 				}
 				NextActivePlayer();
@@ -146,7 +154,24 @@ namespace UpWords
 
 		void LocalNetwork_OnLettersReceived(string serverIP, List<string> letters)
 		{
+			if (m_tileBeingExchanged != null)
+			{
+				m_panelTiles.Remove(m_tileBeingExchanged);
+				m_tileBeingExchanged = null;
+
+				if(OnChangingALetter != null)
+				{
+					OnChangingALetter(true);
+				}
+			}
+
 			AddLettersToPanel(letters);
+		}
+		
+		void LocalNetwork_OnLetterExchange(string senderIP, TileDetails letter)
+		{
+			m_localNetwork.SendLetters(senderIP, GetLetters(1));
+			m_letterBag.Add(letter.Letter);
 		}
 
 		public void SizeChanged()
@@ -274,10 +299,10 @@ namespace UpWords
 			tile.ManipulationMode = ManipulationModes.None;
 
 			m_justPlayedTiles.Add(tile);
-
-			PlaceTileOnBoard(tile, tileData.GridX, tileData.GridY);
-
+			m_playedTiles.Add(tile);
 			m_boardTiles[tile.GridX, tile.GridY] = tile;
+
+			PlaceTileOnBoard(tile, tileData.GridX, tileData.GridY, false);
 		}
 
 		private void AddTileToPanel(string letter, int position)
@@ -324,7 +349,7 @@ namespace UpWords
 
 		public int GetStartPlayer(int numberOfPlayers)
 		{
-			return m_randomiser.Next(numberOfPlayers + 1);
+			return m_randomiser.Next(numberOfPlayers);
 		}
 
 		public void IsPlayersTurn()
@@ -818,15 +843,11 @@ namespace UpWords
 			Rect boardRect = boardTransform.TransformBounds(new Rect(0, 0, m_gameBoard.ActualWidth, m_gameBoard.ActualHeight));
 			Point positionOfBoard = boardTransform.TransformPoint(new Point(0, 0));
 
-			if (setLayer)
-			{
-				draggedItem.Layer = m_boardSpaceFilled[gridX, gridY];
-			}
-
 			tileRenderTransform.X = positionOfBoard.X + (m_tileSize * gridX);// +boardRect.Width * 0.01 - (boardRect.Width * 0.005 * draggedItem.Layer);
 			tileRenderTransform.Y = positionOfBoard.Y + (m_tileSize * gridY);// +boardRect.Height * 0.01 - (boardRect.Height * 0.005 * draggedItem.Layer);
 
-			if (draggedItem.GridY != ON_PANEL && draggedItem.GridX >= 0 && draggedItem.GridY >= 0)
+			if (draggedItem.TileStatus != eTileState.JustPlayed &&
+				draggedItem.GridY != ON_PANEL && draggedItem.GridX >= 0 && draggedItem.GridY >= 0)
 			{
 				m_boardSpaceFilled[draggedItem.GridX, draggedItem.GridY]--;
 			}
@@ -838,6 +859,11 @@ namespace UpWords
 			draggedItem.Visibility = Windows.UI.Xaml.Visibility.Visible;
 
 			m_boardSpaceFilled[gridX, gridY]++;
+
+			if (setLayer)
+			{
+				draggedItem.Layer = m_boardSpaceFilled[gridX, gridY];
+			}
 
 			Canvas.SetZIndex(draggedItem, draggedItem.Layer);
 
@@ -858,28 +884,7 @@ namespace UpWords
 			m_tileBeingExchanged = tileToExchange;
 
 			// Request tile exchange.
-			// ...
-			m_letterBag.Add(tileToExchange.Letter);
-			ReplacementLetterReceived(NextRandomLetter());
-		}
-
-		private void ReplacementLetterReceived(string newLetter)
-		{
-			if (ChangingALetter)
-			{
-				int position = m_tileBeingExchanged.GridX;
-
-				m_panelTiles.Remove(m_tileBeingExchanged);
-
-				AddTileToPanel(newLetter, position);
-
-				ChangingALetter = false;
-
-				if (OnChangingALetter != null)
-				{
-					OnChangingALetter(ChangingALetter);
-				}
-			}
+			m_localNetwork.ExchangeLetter(tileToExchange.TileData);
 		}
 
 		#endregion Server interactions.
@@ -1333,7 +1338,7 @@ namespace UpWords
 
 		public void SubmitWords()
 		{
-			if(TilesAreLayedCorrectly())
+			if (TilesAreLayedCorrectly())
 			{
 				bool allWordsOk = true;
 				List<UpWord> playedWords = GetPlayedWords();
@@ -1358,18 +1363,21 @@ namespace UpWords
 
 				if (allWordsOk)
 				{
+					int replacementTiles = m_currentWordTiles.Count;
 					PlayersTurnDetails iPlayersTurnDetails = new PlayersTurnDetails();
 					iPlayersTurnDetails.PlayersIP = m_localNetwork.IpAddress;
 					iPlayersTurnDetails.PlayerName = m_localNetwork.Username;
 					iPlayersTurnDetails.PlayedWords = playedWords;
-					
+
 					foreach (UpWord playedWord in iPlayersTurnDetails.PlayedWords)
 					{
 						iPlayersTurnDetails.Score += playedWord.Score;
 					}
+					GameSettings.Settings.TotalScore += iPlayersTurnDetails.Score;
+					GameSettings.SaveSettings();
 
-					iPlayersTurnDetails.TotalScore += iPlayersTurnDetails.Score;
-				
+					iPlayersTurnDetails.TotalScore += GameSettings.Settings.TotalScore;
+
 					foreach (TileControl tile in m_justPlayedTiles)
 					{
 						tile.TileStatus = eTileState.Played;
@@ -1399,6 +1407,10 @@ namespace UpWords
 						{
 							m_localNetwork.SendPlayersTurnDetails(playerIP, iPlayersTurnDetails);
 						}
+
+						AddLettersToPanel(GetLetters(replacementTiles));
+						NextActivePlayer();
+						SetActivePlayer();
 					}
 					else
 					{

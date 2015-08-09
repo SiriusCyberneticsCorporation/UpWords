@@ -17,12 +17,18 @@ namespace UpWords
 		public event GamePostHandler OnGameCreatedReceived;
 		public event GamePostHandler OnGameCancelledReceived;
 
+		public delegate void ExchangeLetterHandler(string senderIP, TileDetails letter);
+		public event ExchangeLetterHandler OnLetterExchange;
+
 		public delegate void ActivePlayerHandler(bool active);
 		public event ActivePlayerHandler OnSetActivePlayerReceived;
 
-		public delegate void StartGameHandler(string serverIP, List<string> letters);
-		public event StartGameHandler OnStartGameReceived;
-		public event StartGameHandler OnLettersReceived;
+		public delegate void SimpleIPHandler(string senderIpAddress);
+		public event SimpleIPHandler OnReadyToStartReceivedReceived;
+		public event SimpleIPHandler OnStartGameReceived;
+
+		public delegate void NewLettersHandler(string serverIP, List<string> letters);
+		public event NewLettersHandler OnLettersReceived;
 
 		public delegate void GameJoinedHandler(string playersIpAddress, string playersDetails);
 		public event GameJoinedHandler OnGameJoinedReceived;
@@ -49,6 +55,22 @@ namespace UpWords
 			AddMessageToQueue(message);
 		}
 
+		public void ExchangeLetter(TileDetails letter)
+		{
+			string messageText = Serialiser.SerializeToXml<TileDetails>(letter);
+			NetworkMessage message = new NetworkMessage()
+			{
+				RecipientsIP = IpAddress,
+				MessagePacket = new NetworkMessagePacket()
+				{
+					Command = eProtocol.ExchangeLetter,
+					MessageText = messageText
+				}
+			};
+
+			AddMessageToQueue(message);
+		}
+
 		public void SetActivePlayer(string playerIP, bool active)
 		{
 			string messageText = Serialiser.SerializeToXml<bool>(active);
@@ -65,18 +87,30 @@ namespace UpWords
 			AddMessageToQueue(message);
 		}
 
-		public void StartGame(string playerIP, List<string> startingLetters)
+		public void SendReadyToStart(string serverIP)
+		{
+			NetworkMessage message = new NetworkMessage()
+			{
+				RecipientsIP = serverIP,
+				MessagePacket = new NetworkMessagePacket()
+				{
+					Command = eProtocol.ReadyToStart
+				}
+			};
+
+			AddMessageToQueue(message);
+		}
+
+		public void StartGame(string playerIP)
 		{
 			RemoveMessageFromQueue(BROADCAST_IP, eProtocol.GameCreated);
 
-			string messageText = Serialiser.SerializeToXml<List<string>>(startingLetters);
 			NetworkMessage message = new NetworkMessage()
 			{
 				RecipientsIP = playerIP,
 				MessagePacket = new NetworkMessagePacket()
 				{
-					Command = eProtocol.StartGame,
-					MessageText = messageText
+					Command = eProtocol.StartGame
 				}
 			};
 
@@ -160,6 +194,9 @@ namespace UpWords
 					case eProtocol.Acknowledge:
 						MessageAcknowledged(remoteAddress, message);
 						break;
+					case eProtocol.ExchangeLetter:
+						ExchangeLetterReceived(remoteAddress, message);
+						break;
 					case eProtocol.GameCancelled:
 						GameCancelledReceived(remoteAddress, message);
 						break;
@@ -168,6 +205,9 @@ namespace UpWords
 						break;
 					case eProtocol.GameJoined:
 						GameJoinedReceived(remoteAddress, message);
+						break;
+					case eProtocol.ReadyToStart:
+						ReadyToStartReceived(remoteAddress, message);
 						break;
 					case eProtocol.SendLetters:
 						LettersReceived(remoteAddress, message);
@@ -206,6 +246,16 @@ namespace UpWords
 			}
 		}
 
+		private void ExchangeLetterReceived(HostName remoteAddress, NetworkMessagePacket message)
+		{
+			TileDetails letter = Serialiser.DeserializeFromXml<TileDetails>(message.MessageText);
+
+			if (OnLetterExchange != null)
+			{
+				OnLetterExchange(remoteAddress.CanonicalName, letter);
+			}
+		}
+
 		private void GameCancelledReceived(HostName remoteAddress, NetworkMessagePacket message)
 		{
 			if (remoteAddress.CanonicalName != CurrentIPAddress())
@@ -241,6 +291,14 @@ namespace UpWords
 			*/
 		}
 
+		private void ReadyToStartReceived(HostName remoteAddress, NetworkMessagePacket message)
+		{
+			if (OnReadyToStartReceivedReceived != null)
+			{
+				OnReadyToStartReceivedReceived(remoteAddress.CanonicalName);
+			}
+		}
+
 		private void LettersReceived(HostName remoteAddress, NetworkMessagePacket message)
 		{
 			List<string> letters = Serialiser.DeserializeFromXml<List<string>>(message.MessageText);
@@ -263,11 +321,9 @@ namespace UpWords
 
 		private void StartGameReceived(HostName remoteAddress, NetworkMessagePacket message)
 		{
-			List<string> letters = Serialiser.DeserializeFromXml<List<string>>(message.MessageText);
-
 			if (OnStartGameReceived != null)
 			{
-				OnStartGameReceived(remoteAddress.CanonicalName, letters);
+				OnStartGameReceived(remoteAddress.CanonicalName);
 			}
 		}
 

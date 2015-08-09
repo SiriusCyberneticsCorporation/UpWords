@@ -48,7 +48,7 @@ namespace UpWords
 				m_gameInstance.OnDisplayPlays += GameInstance_OnDisplayPlays;
 				m_gameInstance.TurnIndicator += m_gameInstance_TurnIndicator;
 
-				m_gameInstance.InitialiseGame(m_parentClass.StartingLetters);
+				m_gameInstance.InitialiseGame();
 
 				m_gameTimer.Start();
 			}
