@@ -250,28 +250,32 @@ namespace UpWords
 			try
 			{
 				IInputStream result = args.GetDataStream();
-				Stream resultStream = result.AsStreamForRead(1024);				
-				
+				Stream resultStream = result.AsStreamForRead(1024);
+
 				using (StreamReader reader = new StreamReader(resultStream))
 				{
 					string messageText = reader.ReadToEnd();
-					NetworkMessagePacket message = Serialiser.DeserializeFromXml<NetworkMessagePacket>(messageText);
 
-					if(message.Command == eProtocol.Acknowledge || message.Command == eProtocol.Ping)
+					if (args.RemoteAddress.CanonicalName != CurrentIPAddress())
 					{
-						RemoveMessageFromQueue(message.ID);
-					}
-					else if (!m_recentMessages.Contains(message.ID))
-					{
-						m_recentMessages.Push(message.ID);
+						NetworkMessagePacket message = Serialiser.DeserializeFromXml<NetworkMessagePacket>(messageText);
 
-						await CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync
-							(CoreDispatcherPriority.Normal, () =>
-							{
-								DecodeMessage(args.RemoteAddress, message);
-							});
+						if (message.Command == eProtocol.Acknowledge || message.Command == eProtocol.Ping)
+						{
+							RemoveMessageFromQueue(message.ID);
+						}
+						else if (!m_recentMessages.Contains(message.ID))
+						{
+							m_recentMessages.Push(message.ID);
+
+							await CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync
+								(CoreDispatcherPriority.Normal, () =>
+								{
+									DecodeMessage(args.RemoteAddress, message);
+								});
+						}
+						AcknowledgedMessage(args.RemoteAddress.CanonicalName, message);
 					}
-					AcknowledgedMessage(args.RemoteAddress.CanonicalName, message);
 				}
 			}
 			catch (Exception ex)
