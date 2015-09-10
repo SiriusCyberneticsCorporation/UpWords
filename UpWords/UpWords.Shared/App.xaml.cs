@@ -56,13 +56,8 @@ namespace UpWords
 #endif
 			m_localNetwork = new UpwordsNetworking();
 
-			// TODO - handle ongoing game.
-			GameSettings.Settings.TotalScore = 0;
-			GameSettings.Settings.GameCreated = false;
-			GameSettings.Settings.CreatorsIpAddress = "";
-			GameSettings.Settings.GameTitle = "";
-			GameSettings.Settings.PlayersJoined.Clear();
-			GameSettings.SaveSettings();
+			// FOR NOW, EVERY GAME IS A NEW GAME.
+			GameSettings.ClearSettings();
 
             Frame rootFrame = Window.Current.Content as Frame;
 
@@ -101,14 +96,26 @@ namespace UpWords
                 rootFrame.ContentTransitions = null;
                 rootFrame.Navigated += this.RootFrame_FirstNavigated;
 #endif
-
-                // When the navigation stack isn't restored navigate to the first page,
-                // configuring the new page by passing required information as a navigation
-                // parameter
-				if (!rootFrame.Navigate(typeof(MainPage), this))
+				if (GameSettings.Settings.GameStarted)
 				{
-                    throw new Exception("Failed to create initial page");
-                }
+					// If a game is already underway then go directly to the game page.
+					if (!rootFrame.Navigate(typeof(GamePage), this))
+					{
+						throw new Exception("Failed to create initial page");
+					}
+				}
+				else
+				{
+					//GameSettings.ClearSettings();
+
+					// When the navigation stack isn't restored navigate to the first page,
+					// configuring the new page by passing required information as a navigation
+					// parameter
+					if (!rootFrame.Navigate(typeof(MainPage), this))
+					{
+						throw new Exception("Failed to create initial page");
+					}
+				}
             }
 
             // Ensure the current window is active

@@ -11,5 +11,6 @@ namespace UpWords
 		public string IpAddress;
 		public string Name;
 		public string Machine;
+		public GameLetters CurrentLetters = new GameLetters();
     }
 }

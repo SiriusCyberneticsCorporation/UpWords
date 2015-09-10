@@ -24,7 +24,7 @@ namespace UpWords
 		public event ActivePlayerHandler OnSetActivePlayerReceived;
 
 		public delegate void SimpleIPHandler(string senderIpAddress);
-		public event SimpleIPHandler OnReadyToStartReceivedReceived;
+		public event SimpleIPHandler OnReadyToStartReceived;
 		public event SimpleIPHandler OnStartGameReceived;
 
 		public delegate void NewLettersHandler(string serverIP, GameLetters letters);
@@ -35,6 +35,9 @@ namespace UpWords
 
 		public delegate void TurnDetailsHandler(string playersIpAddress, PlayersTurnDetails iPlayersTurnDetails);
 		public event TurnDetailsHandler OnPlayersTurnDetailsReceived;
+
+		private DateTime m_lastCommunicationsCheck = DateTime.Now;
+		private List<PlayerDetails> m_activePlayers = new List<PlayerDetails>();
 
 		public UpwordsNetworking()
 		{
@@ -186,6 +189,22 @@ namespace UpWords
 			AddMessageToQueue(message);
 		}
 
+		/*
+		public void CheckActivePlayers()
+		{			
+			if (DateTime.Now.Subtract(m_lastCommunicationsCheck).TotalSeconds > 5)
+			{
+				m_lastCommunicationsCheck = DateTime.Now;
+				if (m_activePlayers.Count > 0)
+				{
+					foreach (PlayerDetails iPlayerDetails in m_activePlayers)
+					{
+					}
+				}
+			}
+		}
+		*/
+
 		protected override void DecodeMessage(HostName remoteAddress, NetworkMessagePacket message)
 		{
 			try
@@ -281,9 +300,9 @@ namespace UpWords
 
 		private void ReadyToStartReceived(HostName remoteAddress, NetworkMessagePacket message)
 		{
-			if (OnReadyToStartReceivedReceived != null)
+			if (OnReadyToStartReceived != null)
 			{
-				OnReadyToStartReceivedReceived(remoteAddress.CanonicalName);
+				OnReadyToStartReceived(remoteAddress.CanonicalName);
 			}
 		}
 
@@ -300,6 +319,11 @@ namespace UpWords
 		private void SetActivePlayerReceived(HostName remoteAddress, NetworkMessagePacket message)
 		{
 			PlayerDetails activePlayer = Serialiser.DeserializeFromXml<PlayerDetails>(message.MessageText);
+
+			if(!m_activePlayers.Contains(activePlayer))
+			{
+				m_activePlayers.Add(activePlayer);
+			}
 
 			if (OnSetActivePlayerReceived != null)
 			{

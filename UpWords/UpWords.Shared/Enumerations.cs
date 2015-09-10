@@ -14,6 +14,7 @@ namespace UpWords
 		GameCreated,
 		GameCancelled,
 		GameJoined,
+		Ping,
 		PlayersTurnDetails,
 		ReadyToStart,
 		SendLetters,

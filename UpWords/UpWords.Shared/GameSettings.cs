@@ -11,9 +11,12 @@ namespace UpWords
     public class GameSettings
     {
 		public int TotalScore = 0;
-		public bool GameCreated = false;
+		public bool GameStarted = false;
+		public bool IamGameCreator = false;
+		public string ActivePlayer;
 		public string CreatorsIpAddress;
 		public string GameTitle;
+		public List<string> LetterBag = new List<string>();
 		public PlayerDetails MyDetails = new PlayerDetails();
 		public Dictionary<string, PlayerDetails> PlayersJoined = new Dictionary<string, PlayerDetails>();
 
@@ -33,6 +36,20 @@ namespace UpWords
 				}
 				return m_settings;
 			}
+		}
+
+		public static void ClearSettings()
+		{
+			GameSettings.Settings.TotalScore = 0;
+			GameSettings.Settings.GameStarted = false;
+			GameSettings.Settings.IamGameCreator = false;
+			GameSettings.Settings.ActivePlayer = "";
+			GameSettings.Settings.CreatorsIpAddress = "";
+			GameSettings.Settings.GameTitle = "";
+			GameSettings.Settings.LetterBag = new List<string>();
+			GameSettings.Settings.MyDetails = new PlayerDetails();
+			GameSettings.Settings.PlayersJoined.Clear();
+			GameSettings.SaveSettings();
 		}
 
 		public static void SaveSettings()

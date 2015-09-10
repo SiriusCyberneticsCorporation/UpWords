@@ -65,7 +65,7 @@ namespace UpWords
 			{
 				m_knownGames.Add(gameInformation.GameTitle, gameInformation.CreatorsIpAddress);
 
-				if (!GameSettings.Settings.GameCreated)
+				if (!GameSettings.Settings.IamGameCreator)
 				{
 					AvailableGamesListView.Items.Add(gameInformation.GameTitle);
 					CreateGameButton.IsEnabled = false;
@@ -103,14 +103,14 @@ namespace UpWords
 		{
 			if (m_parentClass != null)
 			{
-				GameSettings.Settings.GameCreated = true;
+				GameSettings.Settings.IamGameCreator = true;
 				GameSettings.Settings.CreatorsIpAddress = m_parentClass.NetworkCommunications.IpAddress;
 				GameSettings.Settings.GameTitle = m_parentClass.NetworkCommunications.Username + " on " + m_parentClass.NetworkCommunications.MachineName;
 				GameSettings.Settings.PlayersJoined.Clear();
 				GameSettings.SaveSettings();
 
 				m_parentClass.NetworkCommunications.CreateGame(GameSettings.Settings.GameTitle);
-				//m_knownGames.Add(GameSettings.Settings.GameTitle, GameSettings.Settings.GameCreated);
+				//m_knownGames.Add(GameSettings.Settings.GameTitle, GameSettings.Settings.IamGameCreator);
 
 				AvailableGamesListView.Items.Clear();
 				ListTitleTextBlock.Text = "Players Joined";
@@ -122,7 +122,7 @@ namespace UpWords
 
 		private void StartGameButton_Click(object sender, RoutedEventArgs e)
 		{
-			if (GameSettings.Settings.GameCreated)
+			if (GameSettings.Settings.IamGameCreator)
 			{
 				Frame.Navigate(typeof(GamePage), m_parentClass);
 			}
@@ -136,7 +136,7 @@ namespace UpWords
 
 				m_parentClass.NetworkCommunications.JoinGame(m_knownGames[gameTitle], GameSettings.Settings.MyDetails);
 
-				GameSettings.Settings.GameCreated = false;
+				GameSettings.Settings.IamGameCreator = false;
 				GameSettings.Settings.CreatorsIpAddress = m_knownGames[gameTitle];
 				GameSettings.SaveSettings();
 				
@@ -153,7 +153,7 @@ namespace UpWords
 
 		private void CancelGameButton_Click(object sender, RoutedEventArgs e)
 		{
-			if (GameSettings.Settings.GameCreated && AvailableGamesListView.SelectedIndex >= 0)
+			if (GameSettings.Settings.IamGameCreator && AvailableGamesListView.SelectedIndex >= 0)
 			{
 				string gameInformation = AvailableGamesListView.SelectedItem as string;
 
@@ -164,14 +164,14 @@ namespace UpWords
 				ListTitleTextBlock.Text = "Available Games";
 				CreateGameButton.IsEnabled = true;
 				StartGameButton.Visibility = Windows.UI.Xaml.Visibility.Collapsed;
-				GameSettings.Settings.GameCreated = false;
+				GameSettings.Settings.IamGameCreator = false;
 				GameSettings.SaveSettings();
 			}
 		}
 
 		private void AvailableGamesListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
 		{
-			if (GameSettings.Settings.GameCreated)
+			if (GameSettings.Settings.IamGameCreator)
 			{
 				if(AvailableGamesListView.SelectedIndex >= 0)
 				{

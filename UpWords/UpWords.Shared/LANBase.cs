@@ -19,12 +19,18 @@ namespace UpWords
 		public delegate void ErrorMessageHandler(string message);
 		public event ErrorMessageHandler OnErrorMessage;
 
+		public delegate void PingResponseHandler(string pingedIpAddress);
+		public event PingResponseHandler OnNoPingResponse;
+
 		public string IpAddress { get { return m_ipAddress; } }
 		public string MachineName { get { return m_machineName; } }
 		public string Username { get { return m_username; } }
 
 		public bool Paused;
 
+		private const int MESSAGE_RETRY_SECONDS = 3;
+		private const int MESSAGE_RETRY_LIMIT = 2;
+		private const int PING_CYCLE_SECONDS = 10;
 		private const string GAME_PORT = "4321";
 		protected const string BROADCAST_IP = "255.255.255.255";
 
@@ -33,6 +39,8 @@ namespace UpWords
 		private string m_username = string.Empty;
 		private string m_ipAddress = string.Empty;
 		private string m_machineName = string.Empty;
+		private DateTime m_lastPingTime = DateTime.MinValue;
+		private List<string> m_ipAddressesToPing = new List<string>();
 		private DatagramSocket m_broadcastSocket = new DatagramSocket();
 
 		private object m_messageQueueLock = new object();
@@ -80,30 +88,53 @@ namespace UpWords
 			{
 				if (!Paused)
 				{
-					await System.Threading.Tasks.Task.Delay(TimeSpan.FromSeconds(1));
-
 					lock (m_messageQueueLock)
 					{
-						NetworkMessage messageToRemove = null;
+						List<NetworkMessage> messagesToRemove = new List<NetworkMessage>();
 
 						foreach (NetworkMessage message in m_outstandingMessages)
 						{
-							if (DateTime.Now.Subtract(message.TimeStamp).TotalSeconds > 3)
+							// If the message has already been tried the appropriate number of times then delete it from the queue.
+							if(message.SendAttempts > MESSAGE_RETRY_LIMIT)
+							{
+								messagesToRemove.Add(message);
+							}
+							// If this is a retry of a ping then assume the remote connection has terminated.
+							else if(message.MessagePacket.Command == eProtocol.Ping && message.SendAttempts > 0)
+							{
+								messagesToRemove.Add(message);
+
+								if (OnNoPingResponse != null)
+								{				
+									OnNoPingResponse(message.RecipientsIP);
+								}
+							}
+							// If sufficient time has passed since the last send then send the message now.
+							else if (DateTime.Now.Subtract(message.TimeStamp).TotalSeconds > MESSAGE_RETRY_SECONDS)
 							{
 								SendMessage(message);
 
+								// If this is an acknowledge message then remove it from the queue immediately.
 								if (message.MessagePacket.Command == eProtocol.Acknowledge)
 								{
-									messageToRemove = message;
+									messagesToRemove.Add(message);
 								}
 							}
 						}
 
-						if (messageToRemove != null)
+						foreach (NetworkMessage messageToRemove in messagesToRemove)
 						{
 							m_outstandingMessages.Remove(messageToRemove);
 						}
 					}
+
+					if (DateTime.Now.Subtract(m_lastPingTime).TotalSeconds > PING_CYCLE_SECONDS)
+					foreach (string ipAddress in m_ipAddressesToPing)
+					{
+						PingAddress(ipAddress);
+					}
+
+					await System.Threading.Tasks.Task.Delay(TimeSpan.FromSeconds(1));
 				}
 				else
 				{
@@ -195,6 +226,7 @@ namespace UpWords
 		{
 			try
 			{
+				message.SendAttempts++;
 				message.TimeStamp = DateTime.Now;
 				using (IOutputStream stream = await m_broadcastSocket.GetOutputStreamAsync(new HostName(message.RecipientsIP), GAME_PORT))
 				{
@@ -225,7 +257,11 @@ namespace UpWords
 					string messageText = reader.ReadToEnd();
 					NetworkMessagePacket message = Serialiser.DeserializeFromXml<NetworkMessagePacket>(messageText);
 
-					if (!m_recentMessages.Contains(message.ID))
+					if(message.Command == eProtocol.Acknowledge || message.Command == eProtocol.Ping)
+					{
+						RemoveMessageFromQueue(message.ID);
+					}
+					else if (!m_recentMessages.Contains(message.ID))
 					{
 						m_recentMessages.Push(message.ID);
 
@@ -242,6 +278,20 @@ namespace UpWords
 			{
 				PostMessage(ex.Message);
 			}
+		}
+
+		private void PingAddress(string ipAddressToPing)
+		{
+			NetworkMessage message = new NetworkMessage()
+			{
+				RecipientsIP = ipAddressToPing,
+				MessagePacket = new NetworkMessagePacket()
+				{
+					Command = eProtocol.Ping
+				}
+			};
+
+			AddMessageToQueue(message);
 		}
 
 		private void AcknowledgedMessage(string recipientsIP, NetworkMessagePacket messagePacket)

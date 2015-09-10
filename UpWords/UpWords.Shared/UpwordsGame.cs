@@ -10,6 +10,7 @@ using Windows.UI.Xaml.Media;
 
 using System.Threading.Tasks;
 using Windows.Storage.Streams;
+using Windows.ApplicationModel;
 
 namespace UpWords
 {
@@ -49,7 +50,6 @@ namespace UpWords
 		private PlayerDetails m_currentActivePlayer = null;
 		private TileControl[,] m_boardTiles = new TileControl[GRID_SIZE, GRID_SIZE];
 
-		private List<string> m_letterBag = new List<string>();
 		private IList<string> m_words = new List<string>();
 
 		private List<TileControl> m_currentWordTiles = new List<TileControl>();
@@ -58,8 +58,6 @@ namespace UpWords
 		private List<TileControl> m_panelTiles = new List<TileControl>();
 		private List<TileControl> m_computersTiles = new List<TileControl>();
 		private Dictionary<string, PlayerDetails> m_activePlayer = new Dictionary<string, PlayerDetails>();
-
-		private MediaElement m_beeper = new MediaElement();
 
 		private TileControl m_tileBeingExchanged = null;
 
@@ -82,7 +80,7 @@ namespace UpWords
 			m_tileCanvas = tileCanvas;
 			m_localNetwork = localNetwork;
 
-			m_localNetwork.OnReadyToStartReceivedReceived += LocalNetwork_OnReadyToStartReceivedReceived;
+			m_localNetwork.OnReadyToStartReceived += LocalNetwork_OnReadyToStartReceived;
 			m_localNetwork.OnSetActivePlayerReceived += LocalNetwork_OnSetActivePlayerReceived;
 			m_localNetwork.OnPlayersTurnDetailsReceived += LocalNetwork_OnPlayersTurnDetailsReceived;
 			m_localNetwork.OnLettersReceived += LocalNetwork_OnLettersReceived;
@@ -95,16 +93,9 @@ namespace UpWords
 
 		public void InitialiseGame()
 		{
-			GameSettings.Settings.MyDetails.ID = Guid.NewGuid();
-			GameSettings.Settings.MyDetails.IpAddress = m_localNetwork.IpAddress;
-			GameSettings.Settings.MyDetails.Machine = m_localNetwork.MachineName;
-			GameSettings.Settings.MyDetails.Name = m_localNetwork.Username;
-			GameSettings.SaveSettings();
-
-			if (GameSettings.Settings.GameCreated)
+			if (GameSettings.Settings.GameStarted)
 			{
-				FillLetterBag();
-				AddLettersToPanel(GetLetters(7));
+				AddLettersToPanel(GameSettings.Settings.MyDetails.CurrentLetters);
 
 				m_activePlayer.Add(m_localNetwork.IpAddress, GameSettings.Settings.MyDetails);
 
@@ -113,13 +104,36 @@ namespace UpWords
 					m_localNetwork.StartGame(playerIP);
 					m_activePlayer.Add(playerIP, GameSettings.Settings.PlayersJoined[playerIP]);
 				}
-				
-				SetStartPlayer();
 			}
 			else
 			{
-				// Let the game controller know we are ready to start.
-				m_localNetwork.SendReadyToStart(GameSettings.Settings.CreatorsIpAddress);
+				GameSettings.Settings.MyDetails.ID = Guid.NewGuid();
+				GameSettings.Settings.MyDetails.IpAddress = m_localNetwork.IpAddress;
+				GameSettings.Settings.MyDetails.Machine = m_localNetwork.MachineName;
+				GameSettings.Settings.MyDetails.Name = m_localNetwork.Username;
+				GameSettings.Settings.GameStarted = true;
+				GameSettings.SaveSettings();
+
+				if (GameSettings.Settings.IamGameCreator)
+				{
+					FillLetterBag();
+					AddLettersToPanel(GetLetters(7));
+
+					m_activePlayer.Add(m_localNetwork.IpAddress, GameSettings.Settings.MyDetails);
+
+					foreach (string playerIP in GameSettings.Settings.PlayersJoined.Keys)
+					{
+						m_localNetwork.StartGame(playerIP);
+						m_activePlayer.Add(playerIP, GameSettings.Settings.PlayersJoined[playerIP]);
+					}
+
+					SetStartPlayer();
+				}
+				else
+				{
+					// Let the game controller know we are ready to start.
+					m_localNetwork.SendReadyToStart(GameSettings.Settings.CreatorsIpAddress);
+				}
 			}
 		}
 
@@ -129,11 +143,21 @@ namespace UpWords
 			m_words = await FileIO.ReadLinesAsync(wordsFile);
 		}
 
-
-		void LocalNetwork_OnReadyToStartReceivedReceived(string playersIpAddress)
+		private void SendLetters(string playersIpAddress, int numberOfLetters)
 		{
-			m_localNetwork.SendLetters(playersIpAddress, GetLetters(7));
-			SendActivePlayer(playersIpAddress);
+			if(GameSettings.Settings.PlayersJoined.ContainsKey(playersIpAddress))
+			{
+				GameLetters newLetters = GetLetters(numberOfLetters);
+				GameSettings.Settings.PlayersJoined[playersIpAddress].CurrentLetters.Letters.AddRange(newLetters.Letters);
+				m_localNetwork.SendLetters(playersIpAddress, newLetters);
+			}
+			GameSettings.SaveSettings();
+		}
+
+		void LocalNetwork_OnReadyToStartReceived(string playersIpAddress)
+		{
+			SendLetters(playersIpAddress, 7);
+			SendActivePlayer();
 		}
 
 		void LocalNetwork_OnSetActivePlayerReceived(PlayerDetails activePlayer)
@@ -145,19 +169,30 @@ namespace UpWords
 		{
 			DisplayPlay(iPlayersTurnDetails);
 
-			if(GameSettings.Settings.GameCreated)
+			if(GameSettings.Settings.IamGameCreator)
 			{
 				foreach (string playerIP in GameSettings.Settings.PlayersJoined.Keys)
 				{
+					// Remove the played letters from the players current letter store.
+					if (GameSettings.Settings.PlayersJoined.ContainsKey(playerIP))
+					{
+						foreach (TileDetails tile in iPlayersTurnDetails.LettersPlayed)
+						{
+							GameSettings.Settings.PlayersJoined[playerIP].CurrentLetters.Letters.Remove(tile.Letter);
+						}
+					}
+
 					if(playerIP != playersIpAddress)
 					{
 						m_localNetwork.SendPlayersTurnDetails(playerIP, iPlayersTurnDetails);
 					}
 					else if (iPlayersTurnDetails.LettersPlayed.Count < 7)
 					{
-						m_localNetwork.SendLetters(playerIP, GetLetters(iPlayersTurnDetails.LettersPlayed.Count));
+						SendLetters(playersIpAddress, iPlayersTurnDetails.LettersPlayed.Count);
 					}
 				}
+				GameSettings.SaveSettings();
+
 				NextActivePlayer();
 			}
 		}
@@ -177,11 +212,29 @@ namespace UpWords
 
 			AddLettersToPanel(letters);
 		}
-		
-		void LocalNetwork_OnLetterExchange(string senderIP, TileDetails letter)
+
+		void LocalNetwork_OnLetterExchange(string playersIpAddress, TileDetails letter)
 		{
-			m_localNetwork.SendLetters(senderIP, GetLetters(1));
-			m_letterBag.Add(letter.Letter);
+			// Only handle the request if it is from a known player.
+			if (GameSettings.Settings.PlayersJoined.ContainsKey(playersIpAddress))
+			{
+				GameLetters newLetter = GetLetters(1);	// Get one new letter from the bag.
+
+				if (newLetter.Letters.Count > 0)
+				{
+					// Remove the returned letter from the players current letters.
+					GameSettings.Settings.PlayersJoined[playersIpAddress].CurrentLetters.Letters.Remove(letter.Letter);
+					// Add the new letter to the players current letters.
+					GameSettings.Settings.PlayersJoined[playersIpAddress].CurrentLetters.Letters.AddRange(newLetter.Letters);
+					// Add the returned latter to the letter bag.
+					GameSettings.Settings.LetterBag.Add(letter.Letter);
+					// Save the configuration in case we crash.
+					GameSettings.SaveSettings();
+
+					// Send the new letter to the player.
+					m_localNetwork.SendLetters(playersIpAddress, newLetter);
+				}
+			}
 		}
 
 		public void SizeChanged()
@@ -213,15 +266,16 @@ namespace UpWords
 
 		public void FillLetterBag()
 		{
-			m_letterBag.Clear();
-
+			GameSettings.Settings.LetterBag.Clear();
 			foreach (UpWordsLetterConfig upWordsLetter in s_UpWordsLetters)
 			{
 				for (int i = 0; i < upWordsLetter.NumberOf; i++)
 				{
-					m_letterBag.Add(upWordsLetter.Letter);
+					GameSettings.Settings.LetterBag.Add(upWordsLetter.Letter);
 				}
 			}
+
+			GameSettings.SaveSettings();	// Save the configuration in case we crash.
 		}
 
 		private void NextActivePlayer()
@@ -267,14 +321,11 @@ namespace UpWords
 
 			if (m_currentActivePlayer != null)
 			{
-				foreach (string playerIP in m_activePlayer.Keys)
-				{
-					SendActivePlayer(playerIP);
-				}
+				SendActivePlayer();
 			}
 		}
 
-		private void SendActivePlayer(string playersIpAddress)
+		private void SendActivePlayer()
 		{
 			foreach (string playerIP in m_activePlayer.Keys)
 			{
@@ -284,6 +335,8 @@ namespace UpWords
 				}
 				else
 				{
+					GameSettings.Settings.ActivePlayer = m_currentActivePlayer.IpAddress;
+					GameSettings.SaveSettings();
 					m_localNetwork.SetActivePlayer(playerIP, m_currentActivePlayer);
 				}
 			}
@@ -312,10 +365,12 @@ namespace UpWords
 
 		private string NextRandomLetter()
 		{
-			int letterIndex = m_randomiser.Next(m_letterBag.Count - 1);
-			string letter = m_letterBag[letterIndex];
+			int letterIndex = m_randomiser.Next(GameSettings.Settings.LetterBag.Count - 1);
+			string letter = GameSettings.Settings.LetterBag[letterIndex];
 
-			m_letterBag.RemoveAt(letterIndex);
+			GameSettings.Settings.LetterBag.RemoveAt(letterIndex);
+			
+			GameSettings.SaveSettings();	// Save the configuration in case we crash.
 
 			return letter;
 		}
@@ -363,19 +418,20 @@ namespace UpWords
 		{
 			GameLetters letters = new GameLetters();
 
-			numberOfLetters = Math.Min(numberOfLetters, m_letterBag.Count);
+			numberOfLetters = Math.Min(numberOfLetters, GameSettings.Settings.LetterBag.Count);
 
 			for (int i = 0; i < numberOfLetters; i++)
 			{
 				letters.Letters.Add(NextRandomLetter());
 			}
-			letters.LettersRemaining = m_letterBag.Count;
+			letters.LettersRemaining = GameSettings.Settings.LetterBag.Count;
 
 			return letters;
 		}
 
 		public void AddLettersToPanel(GameLetters letters)
 		{
+			GameSettings.Settings.MyDetails.CurrentLetters.Letters.AddRange(letters.Letters);
 			for (int i = 0; i < letters.Letters.Count; i++)
 			{
 				AddTileToPanel(letters.Letters[i], i);
@@ -384,7 +440,12 @@ namespace UpWords
 			if(LetterRemaining != null)
 			{
 				LetterRemaining(letters.LettersRemaining.ToString() + " letters remaining");
-			}			
+			}
+
+			if(letters.Letters.Count == 0 && m_panelTiles.Count == 0)
+			{
+				// Signal game over.
+			}
 		}
 
 		public void SetStartPlayer()
@@ -908,9 +969,20 @@ namespace UpWords
 				m_panelTiles.Remove(draggedItem);
 				m_currentWordTiles.Add(draggedItem);
 			}
+
+			PlaySound(draggedItem.Layer);
 		}
 
 		#endregion Letter Dragging Functionality
+
+		private async void PlaySound(int level)
+		{
+			MediaElement soundElement = new MediaElement();
+			StorageFile file = await StorageFile.GetFileFromApplicationUriAsync(new Uri(string.Format("ms-appx:///Assets/Level{0}.mp3", level), UriKind.Absolute)); 
+			var stream = await file.OpenAsync(FileAccessMode.Read);
+			soundElement.SetSource(stream, file.ContentType);
+			soundElement.Play();
+		}
 
 		#region Server interactions.
 
@@ -1488,7 +1560,7 @@ namespace UpWords
 
 					DisplayPlay(iPlayersTurnDetails);
 
-					if (GameSettings.Settings.GameCreated)
+					if (GameSettings.Settings.IamGameCreator)
 					{
 						foreach (string playerIP in GameSettings.Settings.PlayersJoined.Keys)
 						{
